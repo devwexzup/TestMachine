@@ -1,0 +1,1806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Logic Sandbox - Redstone Style (HUD)</title>
+<style>
+:root {
+  --bg: #111;
+  --panel-bg: #181818;
+  --panel-border: #333;
+  --grid-bg: #151515;
+  --cell-size: 24px;
+  --wire-off-brightness: 0.4;
+  --wire-on-brightness: 1.3;
+  --gate-bg: #123a6b;
+  --power-bg: #8b6b1b;
+  --button-bg: #555;
+  --lever-bg: #555;
+  --lamp-off-bg: #4a3215;
+  --lamp-on-bg: #ffd94a;
+  --text: #eee;
+  --accent: #3fa9f5;
+  --accent-soft: #2b6a9b;
+  --tab-bg: #202020;
+  --tab-active-bg: #333;
+  --scrollbar: #444;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* GRID FULLSCREEN BEHIND HUD */
+.grid-container {
+  position: absolute;
+  inset: 0;
+  padding: 16px 280px;
+  background: var(--grid-bg);
+  overflow: auto;
+  cursor: default;
+  z-index: 1;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(64, var(--cell-size));
+  grid-template-rows: repeat(64, var(--cell-size));
+  gap: 0;
+  background: #101010;
+  border: 1px solid #222;
+}
+.cell {
+  width: var(--cell-size);
+  height: var(--cell-size);
+  border: 1px solid #1b1b1b;
+  position: relative;
+  background: #181818;
+  cursor: pointer;
+}
+.cell::after {
+  content: "";
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 2px;
+  opacity: 0;
+}
+
+/* WIRES */
+.cell-wire {
+  background: #202020;
+  color: #ff0000;
+}
+.cell-wire::after {
+  opacity: 1;
+  background: currentColor;
+  filter: brightness(var(--wire-off-brightness));
+}
+.cell-wire.powered::after {
+  filter: brightness(var(--wire-on-brightness));
+  box-shadow: 0 0 6px currentColor;
+}
+.cell-wire-universal {
+  background: #202020;
+  color: #aaaaaa;
+}
+.cell-wire-universal::after {
+  opacity: 1;
+  background: currentColor;
+  filter: brightness(var(--wire-off-brightness));
+}
+.cell-wire-universal.powered::after {
+  filter: brightness(var(--wire-on-brightness));
+  box-shadow: 0 0 6px currentColor;
+}
+
+/* GATES & BLOCKS */
+.cell-gate {
+  background: var(--gate-bg);
+  border-color: #1f4f86;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cell-gate .io {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+}
+.io-input {
+  background: #4aa3ff;
+}
+.io-output {
+  background: #ff4a4a;
+}
+.cell-power {
+  background: var(--power-bg);
+  color: #000;
+  font-weight: 700;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cell-button,
+.cell-lever {
+  background: var(--button-bg);
+  color: #fff;
+  font-weight: 700;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cell-button.on,
+.cell-lever.on {
+  box-shadow: 0 0 6px #4aff7b;
+  border-color: #4aff7b;
+}
+.cell-lamp {
+  background: var(--lamp-off-bg);
+  color: #fff;
+  font-weight: 700;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cell-lamp.on {
+  background: var(--lamp-on-bg);
+  box-shadow: 0 0 10px var(--lamp-on-bg);
+  color: #000;
+}
+
+/* SPECIAL BLOCKS */
+.cell-delay {
+  background: #5b3a8b;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cell-pulse {
+  background: #8b3a3a;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cell-memory {
+  background: #2f5b3a;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cell-comparator {
+  background: #5b5b2f;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cell-sensor {
+  background: #3a5b5b;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cell-colorlock {
+  background: #444;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* HUD PANELS */
+.panel {
+  position: fixed;
+  top: 0;
+  width: 260px;
+  height: 100vh;
+  background: var(--panel-bg);
+  border-right: 1px solid var(--panel-border);
+  display: flex;
+  flex-direction: column;
+  z-index: 10;
+}
+.panel-left {
+  left: 0;
+}
+.panel-right {
+  right: 0;
+  border-right: none;
+  border-left: 1px solid var(--panel-border);
+}
+.panel-header {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--panel-border);
+  font-weight: 600;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.panel-content {
+  flex: 1;
+  overflow: auto;
+  padding: 8px;
+}
+.tabs {
+  display: flex;
+  border-bottom: 1px solid var(--panel-border);
+}
+.tab {
+  flex: 1;
+  padding: 6px 4px;
+  text-align: center;
+  font-size: 13px;
+  cursor: pointer;
+  background: var(--tab-bg);
+  border-right: 1px solid var(--panel-border);
+  user-select: none;
+}
+.tab:last-child {
+  border-right: none;
+}
+.tab.active {
+  background: var(--tab-active-bg);
+  color: #fff;
+  font-weight: 600;
+}
+.tool-list {
+  padding: 8px 4px;
+}
+.tool-item {
+  padding: 6px 8px;
+  margin-bottom: 4px;
+  background: #222;
+  border-radius: 4px;
+  border: 1px solid #333;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.tool-item span {
+  font-size: 11px;
+  opacity: 0.7;
+}
+.tool-item.active {
+  border-color: var(--accent);
+  background: #1f2a36;
+}
+.status {
+  padding: 8px;
+  border-bottom: 1px solid var(--panel-border);
+  font-size: 13px;
+}
+.mode-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px;
+}
+.mode-btn {
+  flex: 1 1 30%;
+  padding: 4px 2px;
+  font-size: 11px;
+  background: #222;
+  border-radius: 4px;
+  border: 1px solid #333;
+  cursor: pointer;
+  text-align: center;
+  user-select: none;
+}
+.mode-btn.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* PALETTE */
+.palette {
+  padding: 8px;
+  border-top: 1px solid var(--panel-border);
+}
+.palette-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.color-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+  border: 1px solid #444;
+  cursor: pointer;
+}
+.color-swatch.active {
+  border-color: #fff;
+  box-shadow: 0 0 4px #fff;
+}
+.palette label {
+  font-size: 12px;
+  display: block;
+  margin-bottom: 4px;
+}
+#colorPicker {
+  width: 100%;
+  height: 28px;
+  border-radius: 4px;
+  border: 1px solid #444;
+  background: #222;
+}
+.last-color {
+  width: 24px;
+  height: 24px;
+  border-radius: 3px;
+  border: 1px solid #666;
+}
+.last-color-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+/* FAVORITE COLORS */
+.favorites-row {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+}
+.favorite-slot {
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+  border: 1px solid #555;
+  cursor: pointer;
+  background: #222;
+}
+
+/* TIMELINE */
+.timeline {
+  padding: 6px 8px;
+  border-top: 1px solid var(--panel-border);
+  max-height: 120px;
+  overflow: auto;
+  font-size: 11px;
+}
+.timeline-item {
+  padding: 2px 0;
+  cursor: pointer;
+  opacity: 0.8;
+}
+.timeline-item:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+
+/* MINIMAP & CONTROLS */
+.minimap-container {
+  padding: 6px 8px;
+  border-top: 1px solid var(--panel-border);
+}
+#minimap {
+  width: 200px;
+  height: 200px;
+  background: #000;
+  border: 1px solid #444;
+  display: block;
+  margin: 4px auto;
+}
+.zoom-row {
+  padding: 4px 8px;
+  font-size: 11px;
+}
+.zoom-row input[type="range"] {
+  width: 100%;
+}
+
+/* ACTION BUTTONS */
+.action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 8px;
+  border-top: 1px solid var(--panel-border);
+}
+.action-btn {
+  flex: 1 1 45%;
+  padding: 4px;
+  font-size: 11px;
+  background: #222;
+  border-radius: 4px;
+  border: 1px solid #333;
+  cursor: pointer;
+  text-align: center;
+}
+
+/* FOOTER */
+.footer {
+  padding: 4px 8px;
+  font-size: 11px;
+  opacity: 0.6;
+  border-top: 1px solid var(--panel-border);
+}
+
+/* SCROLLBARS */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #111;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar);
+}
+</style>
+</head>
+<body>
+
+<!-- GRID -->
+<div class="grid-container" id="gridContainer">
+  <div class="grid" id="grid"></div>
+</div>
+
+<!-- LEFT PANEL -->
+<div class="panel panel-left">
+  <div class="panel-header">Tools</div>
+  <div class="tabs">
+    <div class="tab active" data-tab="wires">Wires</div>
+    <div class="tab" data-tab="logic">Logic</div>
+    <div class="tab" data-tab="special">Special</div>
+    <div class="tab" data-tab="utility">Utility</div>
+  </div>
+  <div class="panel-content">
+    <!-- WIRES -->
+    <div class="tool-list" data-tab-content="wires">
+      <div class="tool-item active" data-tool="wire-colored">
+        Wire (Colored) <span>wire</span>
+      </div>
+      <div class="tool-item" data-tool="wire-universal">
+        Wire (Universal) <span>wire_universal</span>
+      </div>
+      <div class="tool-item" data-tool="color-lock-wire">
+        Color Lock Wire <span>lock</span>
+      </div>
+    </div>
+
+    <!-- LOGIC -->
+    <div class="tool-list" data-tab-content="logic" style="display:none;">
+      <div class="tool-item" data-tool="gate-and">AND Gate <span>gate</span></div>
+      <div class="tool-item" data-tool="gate-or">OR Gate <span>gate</span></div>
+      <div class="tool-item" data-tool="gate-xor">XOR Gate <span>gate</span></div>
+      <div class="tool-item" data-tool="gate-nand">NAND Gate <span>gate</span></div>
+      <div class="tool-item" data-tool="gate-nor">NOR Gate <span>gate</span></div>
+      <div class="tool-item" data-tool="gate-xnor">XNOR Gate <span>gate</span></div>
+      <div class="tool-item" data-tool="delay-block">Delay Block <span>delay</span></div>
+      <div class="tool-item" data-tool="pulse-generator">Pulse Generator <span>pulse</span></div>
+      <div class="tool-item" data-tool="memory-cell">Memory Cell <span>SR/D</span></div>
+      <div class="tool-item" data-tool="comparator-block">Comparator Block <span>cmp</span></div>
+    </div>
+
+    <!-- SPECIAL -->
+    <div class="tool-list" data-tab-content="special" style="display:none;">
+      <div class="tool-item" data-tool="power">
+        Power Source <span>power</span>
+      </div>
+      <div class="tool-item" data-tool="button">
+        Button <span>button</span>
+      </div>
+      <div class="tool-item" data-tool="lever">
+        Lever <span>lever</span>
+      </div>
+      <div class="tool-item" data-tool="lamp">
+        Lamp <span>lamp</span>
+      </div>
+      <div class="tool-item" data-tool="multi-lamp">
+        Multi-Lamp <span>lamp+</span>
+      </div>
+      <div class="tool-item" data-tool="sensor-block">
+        Sensor Block <span>sensor</span>
+      </div>
+    </div>
+
+    <!-- UTILITY -->
+    <div class="tool-list" data-tab-content="utility" style="display:none;">
+      <div class="tool-item" data-tool="eraser">
+        Eraser <span>erase</span>
+      </div>
+      <div class="tool-item" data-tool="clear-all">
+        Clear All <span>grid</span>
+      </div>
+      <div class="tool-item" data-tool="paint-bucket">
+        Paint Bucket <span>fill</span>
+      </div>
+      <div class="tool-item" data-tool="clone-tool">
+        Clone Tool <span>clone</span>
+      </div>
+      <div class="tool-item" data-tool="area-delete">
+        Area Delete <span>area</span>
+      </div>
+    </div>
+  </div>
+  <div class="footer">Click a tool, then click on the grid to place / use it.</div>
+</div>
+
+<!-- RIGHT PANEL -->
+<div class="panel panel-right">
+  <div class="panel-header">Modes & Colors</div>
+  <div class="status" id="statusText">Mode: mouse | Tool: wire-colored</div>
+
+  <!-- MODES -->
+  <div class="mode-buttons">
+    <div class="mode-btn active" data-mode="mouse">Mouse</div>
+    <div class="mode-btn" data-mode="drag">Drag</div>
+    <div class="mode-btn" data-mode="rotate">Rotate</div>
+    <div class="mode-btn" data-mode="erase">Erase</div>
+    <div class="mode-btn" data-mode="select">Select</div>
+    <div class="mode-btn" data-mode="measure">Measure</div>
+    <div class="mode-btn" data-mode="inspect">Inspect</div>
+    <div class="mode-btn" data-mode="freeze">Freeze</div>
+    <div class="mode-btn" data-mode="autoroute">Auto-Route</div>
+    <div class="mode-btn" data-mode="multiplace">Multi-Place</div>
+  </div>
+
+  <!-- INFO -->
+  <div class="panel-content">
+    <div style="font-size:13px;margin-bottom:6px;">Info:</div>
+    <ul style="margin:0 0 10px 16px;font-size:11px;padding:0;">
+      <li><b>Mouse</b>: place blocks, toggle buttons/levers, recolor wires.</li>
+      <li><b>Drag</b>: hold mouse in grid to move the view.</li>
+      <li><b>Rotate</b>: click blocks to rotate orientation.</li>
+      <li><b>Erase</b>: click to erase cells.</li>
+      <li><b>Select</b>: drag a rectangle to select an area.</li>
+      <li><b>Measure</b>: click two cells to measure distance.</li>
+      <li><b>Inspect</b>: click to see cell info in console.</li>
+      <li><b>Freeze</b>: pause/resume simulation.</li>
+      <li><b>Auto-Route</b>: click start and end to auto-wire.</li>
+      <li><b>Multi-Place</b>: hold mouse to paint continuously.</li>
+    </ul>
+  </div>
+
+  <!-- PALETTE -->
+  <div class="palette">
+    <label>Wire Color Palette</label>
+    <div class="palette-row" id="paletteRow"></div>
+    <label>Custom Color</label>
+    <input type="color" id="colorPicker" value="#ff0000">
+    <div style="margin-top:8px;">
+      <div class="last-color-row">
+        <div class="last-color" id="lastColorBox"></div>
+        <span>Last used color</span>
+      </div>
+    </div>
+    <div style="margin-top:8px;font-size:12px;">Favorite Colors</div>
+    <div class="favorites-row" id="favoritesRow"></div>
+  </div>
+
+  <!-- ACTION BUTTONS -->
+  <div class="action-buttons">
+    <div class="action-btn" id="undoBtn">Undo (Ctrl+Z)</div>
+    <div class="action-btn" id="redoBtn">Redo (Ctrl+Y)</div>
+    <div class="action-btn" id="saveBtn">Save to TXT</div>
+    <div class="action-btn" id="loadBtn">Load from TXT</div>
+    <div class="action-btn" id="exportBtn">Export PNG</div>
+  </div>
+
+  <!-- ZOOM -->
+  <div class="zoom-row">
+    Zoom
+    <input type="range" id="zoomSlider" min="12" max="48" value="24">
+  </div>
+
+  <!-- MINIMAP -->
+  <div class="minimap-container">
+    <div style="font-size:12px;">Minimap</div>
+    <canvas id="minimap"></canvas>
+  </div>
+
+  <!-- TIMELINE -->
+  <div class="timeline" id="timeline"></div>
+
+  <div class="footer">Simulation runs in real-time. Use Freeze mode to pause.</div>
+</div>
+
+<script>
+(function() {
+  const GRID_SIZE = 64;
+  const gridEl = document.getElementById('grid');
+  const gridContainer = document.getElementById('gridContainer');
+  const statusText = document.getElementById('statusText');
+  const paletteRow = document.getElementById('paletteRow');
+  const colorPicker = document.getElementById('colorPicker');
+  const lastColorBox = document.getElementById('lastColorBox');
+  const favoritesRow = document.getElementById('favoritesRow');
+  const minimap = document.getElementById('minimap');
+  const minimapCtx = minimap.getContext('2d');
+  const zoomSlider = document.getElementById('zoomSlider');
+  const timelineEl = document.getElementById('timeline');
+  const undoBtn = document.getElementById('undoBtn');
+  const redoBtn = document.getElementById('redoBtn');
+  const saveBtn = document.getElementById('saveBtn');
+  const loadBtn = document.getElementById('loadBtn');
+  const exportBtn = document.getElementById('exportBtn');
+
+  const cells = [];
+  let currentTool = 'wire-colored';
+  let currentMode = 'mouse';
+  let activeColor = '#ff0000';
+  let lastColor = '#ff0000';
+  let simulationFrozen = false;
+
+  const paletteColors = [
+    '#ff0000', '#00ff00', '#0000ff', '#ffff00',
+    '#ff00ff', '#00ffff', '#ffffff', '#ffa500',
+    '#00ff7f', '#8a2be2', '#ff1493', '#00bfff'
+  ];
+
+  const favoriteColors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ffffff'];
+
+  let isDragging = false;
+  let dragStartX = 0;
+  let dragStartY = 0;
+  let dragScrollLeft = 0;
+  let dragScrollTop = 0;
+
+  let isMouseDown = false;
+  let selectionStart = null;
+  let measureStart = null;
+  let autorouteStart = null;
+
+  let undoStack = [];
+  let redoStack = [];
+  const MAX_HISTORY = 50;
+
+  function createGrid() {
+    for (let y = 0; y < GRID_SIZE; y++) {
+      cells[y] = [];
+      for (let x = 0; x < GRID_SIZE; x++) {
+        const cellEl = document.createElement('div');
+        cellEl.className = 'cell';
+        cellEl.dataset.x = x;
+        cellEl.dataset.y = y;
+        gridEl.appendChild(cellEl);
+
+        const cell = {
+          x,
+          y,
+          el: cellEl,
+          type: 'empty',
+          gateType: null,
+          orientation: 0,
+          color: null,
+          powered: false,
+          on: false,
+          delay: 0,
+          pulsePhase: 0,
+          memoryState: false,
+          sensorType: null,
+          colorLock: null
+        };
+        cells[y][x] = cell;
+
+        cellEl.addEventListener('mousedown', (e) => {
+          isMouseDown = true;
+          handleCellInteraction(cell, e);
+        });
+        cellEl.addEventListener('mouseenter', (e) => {
+          if (isMouseDown && currentMode === 'multiplace') {
+            handleCellInteraction(cell, e, true);
+          }
+        });
+        cellEl.addEventListener('click', (e) => {
+          if (currentMode === 'drag') return;
+        });
+      }
+    }
+  }
+
+  function setStatus() {
+    statusText.textContent = `Mode: ${currentMode} | Tool: ${currentTool}`;
+  }
+
+  function setupTabsAndTools() {
+    const tabs = document.querySelectorAll('.tab');
+    const tabContents = document.querySelectorAll('[data-tab-content]');
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        tabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        const name = tab.dataset.tab;
+        tabContents.forEach(c => {
+          c.style.display = c.dataset.tabContent === name ? 'block' : 'none';
+        });
+      });
+    });
+
+    const toolItems = document.querySelectorAll('.tool-item');
+    toolItems.forEach(item => {
+      item.addEventListener('click', () => {
+        toolItems.forEach(i => i.classList.remove('active'));
+        item.classList.add('active');
+        currentTool = item.dataset.tool;
+        setStatus();
+      });
+    });
+  }
+
+  function setupModes() {
+    const modeBtns = document.querySelectorAll('.mode-btn');
+    modeBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        modeBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentMode = btn.dataset.mode;
+        setStatus();
+      });
+    });
+  }
+
+  function setupPalette() {
+    paletteColors.forEach(color => {
+      const sw = document.createElement('div');
+      sw.className = 'color-swatch';
+      sw.style.background = color;
+      sw.dataset.color = color;
+      sw.addEventListener('click', () => {
+        activeColor = color;
+        lastColor = color;
+        updatePaletteActive();
+        updateLastColorBox();
+      });
+      paletteRow.appendChild(sw);
+    });
+    updatePaletteActive();
+    updateLastColorBox();
+
+    colorPicker.addEventListener('input', () => {
+      activeColor = colorPicker.value;
+      lastColor = activeColor;
+      updatePaletteActive();
+      updateLastColorBox();
+    });
+
+    favoriteColors.forEach((color, idx) => {
+      const slot = document.createElement('div');
+      slot.className = 'favorite-slot';
+      slot.style.background = color;
+      slot.dataset.index = idx;
+      slot.addEventListener('click', (e) => {
+        if (e.shiftKey) {
+          favoriteColors[idx] = activeColor;
+          slot.style.background = activeColor;
+        } else {
+          activeColor = favoriteColors[idx];
+          lastColor = activeColor;
+          updatePaletteActive();
+          updateLastColorBox();
+        }
+      });
+      favoritesRow.appendChild(slot);
+    });
+  }
+
+  function updatePaletteActive() {
+    const swatches = document.querySelectorAll('.color-swatch');
+    swatches.forEach(sw => {
+      if (sw.dataset.color.toLowerCase() === activeColor.toLowerCase()) {
+        sw.classList.add('active');
+      } else {
+        sw.classList.remove('active');
+      }
+    });
+  }
+
+  function updateLastColorBox() {
+    lastColorBox.style.background = lastColor;
+  }
+
+  function setupDrag() {
+    gridContainer.addEventListener('mousedown', (e) => {
+      if (currentMode !== 'drag') return;
+      isDragging = true;
+      dragStartX = e.clientX;
+      dragStartY = e.clientY;
+      dragScrollLeft = gridContainer.scrollLeft;
+      dragScrollTop = gridContainer.scrollTop;
+      gridContainer.style.cursor = 'grabbing';
+      e.preventDefault();
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      const dx = e.clientX - dragStartX;
+      const dy = e.clientY - dragStartY;
+      gridContainer.scrollLeft = dragScrollLeft - dx;
+      gridContainer.scrollTop = dragScrollTop - dy;
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (isDragging) {
+        isDragging = false;
+        gridContainer.style.cursor = 'default';
+      }
+      isMouseDown = false;
+      selectionStart = null;
+    });
+  }
+
+  function handleCellInteraction(cell, e, isDragPaint = false) {
+    if (currentMode === 'drag') return;
+
+    if (!isDragPaint) {
+      pushHistory('edit');
+    }
+
+    if (currentMode === 'erase') {
+      eraseCell(cell);
+      return;
+    }
+
+    if (currentMode === 'measure') {
+      if (!measureStart) {
+        measureStart = cell;
+      } else {
+        const dx = Math.abs(cell.x - measureStart.x);
+        const dy = Math.abs(cell.y - measureStart.y);
+        console.log(`Measure: dx=${dx}, dy=${dy}, manhattan=${dx+dy}`);
+        measureStart = null;
+      }
+      return;
+    }
+
+    if (currentMode === 'inspect') {
+      console.log('Inspect cell:', JSON.parse(JSON.stringify(cell)));
+      return;
+    }
+
+    if (currentMode === 'freeze') {
+      simulationFrozen = !simulationFrozen;
+      return;
+    }
+
+    if (currentMode === 'autoroute') {
+      if (!autorouteStart) {
+        autorouteStart = cell;
+      } else {
+        autoRoute(autorouteStart, cell);
+        autorouteStart = null;
+      }
+      return;
+    }
+
+    if (currentMode === 'select') {
+      if (!selectionStart) {
+        selectionStart = cell;
+      } else {
+        const x1 = Math.min(selectionStart.x, cell.x);
+        const x2 = Math.max(selectionStart.x, cell.x);
+        const y1 = Math.min(selectionStart.y, cell.y);
+        const y2 = Math.max(selectionStart.y, cell.y);
+        console.log(`Selected area: (${x1},${y1}) to (${x2},${y2})`);
+        selectionStart = null;
+      }
+      return;
+    }
+
+    if (currentMode === 'rotate') {
+      if (['gate', 'power', 'button', 'lever', 'lamp', 'multi-lamp', 'delay', 'pulse', 'memory', 'comparator', 'sensor', 'colorlock'].includes(cell.type)) {
+        cell.orientation = (cell.orientation + 1) % 4;
+      }
+      return;
+    }
+
+    if (currentMode === 'multiplace' && isDragPaint) {
+      placeTool(cell, true);
+      return;
+    }
+
+    if (currentMode === 'mouse') {
+      placeTool(cell, false);
+    }
+  }
+
+  function placeTool(cell, silent) {
+    if (cell.type === 'button' || cell.type === 'lever') {
+      if (currentTool === 'eraser') {
+        eraseCell(cell);
+      } else {
+        cell.on = !cell.on;
+      }
+      return;
+    }
+
+    if (currentTool === 'eraser') {
+      eraseCell(cell);
+      return;
+    }
+
+    if (currentTool === 'clear-all') {
+      clearAll();
+      return;
+    }
+
+    if (currentTool === 'paint-bucket') {
+      floodFill(cell);
+      return;
+    }
+
+    if (currentTool === 'area-delete') {
+      if (!selectionStart) {
+        selectionStart = cell;
+      } else {
+        const x1 = Math.min(selectionStart.x, cell.x);
+        const x2 = Math.max(selectionStart.x, cell.x);
+        const y1 = Math.min(selectionStart.y, cell.y);
+        const y2 = Math.max(selectionStart.y, cell.y);
+        for (let y = y1; y <= y2; y++) {
+          for (let x = x1; x <= x2; x++) {
+            eraseCell(cells[y][x]);
+          }
+        }
+        selectionStart = null;
+      }
+      return;
+    }
+
+    if (currentTool === 'clone-tool') {
+      if (!selectionStart) {
+        selectionStart = cell;
+      } else {
+        const x1 = Math.min(selectionStart.x, cell.x);
+        const x2 = Math.max(selectionStart.x, cell.x);
+        const y1 = Math.min(selectionStart.y, cell.y);
+        const y2 = Math.max(selectionStart.y, cell.y);
+        const clone = [];
+        for (let y = y1; y <= y2; y++) {
+          const row = [];
+          for (let x = x1; x <= x2; x++) {
+            row.push(structuredCloneCell(cells[y][x]));
+          }
+          clone.push(row);
+        }
+        window._lastClone = { data: clone, w: x2 - x1 + 1, h: y2 - y1 + 1 };
+        console.log('Clone stored. Click a cell to paste.');
+        selectionStart = null;
+      }
+      return;
+    }
+
+    if (currentTool === 'wire-colored') {
+      if (cell.type === 'wire') {
+        cell.color = activeColor;
+        lastColor = activeColor;
+        updateLastColorBox();
+        return;
+      }
+      cell.type = 'wire';
+      cell.color = activeColor;
+      cell.gateType = null;
+      cell.on = false;
+      return;
+    }
+
+    switch (currentTool) {
+      case 'wire-universal':
+        cell.type = 'wire_universal';
+        cell.color = null;
+        cell.gateType = null;
+        cell.on = false;
+        break;
+      case 'color-lock-wire':
+        cell.type = 'colorlock';
+        cell.colorLock = activeColor;
+        break;
+      case 'gate-and':
+      case 'gate-or':
+      case 'gate-xor':
+      case 'gate-nand':
+      case 'gate-nor':
+      case 'gate-xnor':
+        cell.type = 'gate';
+        cell.gateType = currentTool.split('-')[1];
+        cell.on = false;
+        break;
+      case 'delay-block':
+        cell.type = 'delay';
+        cell.delay = 2;
+        break;
+      case 'pulse-generator':
+        cell.type = 'pulse';
+        cell.pulsePhase = 0;
+        break;
+      case 'memory-cell':
+        cell.type = 'memory';
+        cell.memoryState = false;
+        break;
+      case 'comparator-block':
+        cell.type = 'comparator';
+        break;
+      case 'power':
+        cell.type = 'power';
+        cell.gateType = null;
+        cell.on = false;
+        break;
+      case 'button':
+        cell.type = 'button';
+        cell.gateType = null;
+        cell.on = false;
+        break;
+      case 'lever':
+        cell.type = 'lever';
+        cell.gateType = null;
+        cell.on = false;
+        break;
+      case 'lamp':
+        cell.type = 'lamp';
+        cell.gateType = null;
+        cell.on = false;
+        break;
+      case 'multi-lamp':
+        cell.type = 'multi-lamp';
+        cell.gateType = null;
+        cell.on = false;
+        break;
+      case 'sensor-block':
+        cell.type = 'sensor';
+        cell.sensorType = 'basic';
+        break;
+      default:
+        break;
+    }
+
+    if (!silent && window._lastClone && currentTool === 'clone-tool') {
+      const clone = window._lastClone;
+      for (let yy = 0; yy < clone.h; yy++) {
+        for (let xx = 0; xx < clone.w; xx++) {
+          const tx = cell.x + xx;
+          const ty = cell.y + yy;
+          if (tx >= 0 && tx < GRID_SIZE && ty >= 0 && ty < GRID_SIZE) {
+            const src = clone.data[yy][xx];
+            const dst = cells[ty][tx];
+            Object.assign(dst, structuredCloneCell(src), { el: dst.el, x: tx, y: ty });
+          }
+        }
+      }
+    }
+  }
+
+  function eraseCell(cell) {
+    cell.type = 'empty';
+    cell.gateType = null;
+    cell.color = null;
+    cell.on = false;
+    cell.powered = false;
+    cell.delay = 0;
+    cell.pulsePhase = 0;
+    cell.memoryState = false;
+    cell.sensorType = null;
+    cell.colorLock = null;
+  }
+
+  function structuredCloneCell(c) {
+    return {
+      type: c.type,
+      gateType: c.gateType,
+      orientation: c.orientation,
+      color: c.color,
+      powered: c.powered,
+      on: c.on,
+      delay: c.delay,
+      pulsePhase: c.pulsePhase,
+      memoryState: c.memoryState,
+      sensorType: c.sensorType,
+      colorLock: c.colorLock
+    };
+  }
+
+  function neighbors(x, y) {
+    const res = [];
+    if (x > 0) res.push({ dir: 'left', cell: cells[y][x - 1] });
+    if (x < GRID_SIZE - 1) res.push({ dir: 'right', cell: cells[y][x + 1] });
+    if (y > 0) res.push({ dir: 'up', cell: cells[y - 1][x] });
+    if (y < GRID_SIZE - 1) res.push({ dir: 'down', cell: cells[y + 1][x] });
+    return res;
+  }
+
+  function isWire(cell) {
+    return cell.type === 'wire' || cell.type === 'wire_universal';
+  }
+
+  function wireColorConnects(a, b) {
+    if (!isWire(a) || !isWire(b)) return true;
+    if (a.type === 'wire_universal' || b.type === 'wire_universal') return true;
+    if (!a.color || !b.color) return false;
+    return a.color.toLowerCase() === b.color.toLowerCase();
+  }
+
+  function isBlockSideInput(block, side) {
+    if (block.type === 'gate' || block.type === 'delay' || block.type === 'pulse' || block.type === 'memory' || block.type === 'comparator') {
+      const o = block.orientation;
+      if (o === 0 || o === 2) {
+        return side === 'up' || side === 'down';
+      } else if (o === 1 || o === 3) {
+        return side === 'left' || side === 'right';
+      }
+    } else if (block.type === 'button' || block.type === 'lever') {
+      const o = block.orientation;
+      if (o === 0) return side === 'left';
+      if (o === 1) return side === 'up';
+      if (o === 2) return side === 'right';
+      if (o === 3) return side === 'down';
+    } else if (block.type === 'power') {
+      return true;
+    } else if (block.type === 'lamp' || block.type === 'multi-lamp' || block.type === 'sensor') {
+      return true;
+    }
+    return false;
+  }
+
+  function isBlockSideOutput(block, side) {
+    if (block.type === 'gate' || block.type === 'delay' || block.type === 'pulse' || block.type === 'memory' || block.type === 'comparator') {
+      const o = block.orientation;
+      if (o === 0) return side === 'right';
+      if (o === 1) return side === 'down';
+      if (o === 2) return side === 'left';
+      if (o === 3) return side === 'up';
+    } else if (block.type === 'button' || block.type === 'lever') {
+      const o = block.orientation;
+      if (o === 0) return side === 'right';
+      if (o === 1) return side === 'down';
+      if (o === 2) return side === 'left';
+      if (o === 3) return side === 'up';
+    } else if (block.type === 'power') {
+      return true;
+    } else if (block.type === 'lamp' || block.type === 'multi-lamp' || block.type === 'sensor') {
+      return false;
+    }
+    return false;
+  }
+
+  function oppositeSide(side) {
+    if (side === 'left') return 'right';
+    if (side === 'right') return 'left';
+    if (side === 'up') return 'down';
+    if (side === 'down') return 'up';
+    return null;
+  }
+
+  function simulate() {
+    if (simulationFrozen) {
+      render();
+      return;
+    }
+
+    for (let y = 0; y < GRID_SIZE; y++) {
+      for (let x = 0; x < GRID_SIZE; x++) {
+        const c = cells[y][x];
+        c.powered = false;
+        if (c.type === 'lamp' || c.type === 'multi-lamp') c.on = false;
+      }
+    }
+
+    for (let y = 0; y < GRID_SIZE; y++) {
+      for (let x = 0; x < GRID_SIZE; x++) {
+        const c = cells[y][x];
+        if (c.type === 'power') {
+          c.powered = true;
+        } else if ((c.type === 'lever' || c.type === 'button') && c.on) {
+          c.powered = true;
+        } else if (c.type === 'pulse') {
+          c.pulsePhase = (c.pulsePhase + 1) % 10;
+          c.powered = c.pulsePhase < 5;
+        } else if (c.type === 'sensor') {
+          c.powered = true;
+        } else if (c.type === 'memory') {
+          if (c.memoryState) c.powered = true;
+        }
+      }
+    }
+
+    propagateWires();
+
+    const gateOutputs = [];
+    for (let y = 0; y < GRID_SIZE; y++) {
+      for (let x = 0; x < GRID_SIZE; x++) {
+        const c = cells[y][x];
+        if (c.type === 'gate') {
+          const inputsPowered = getGateInputsPowered(c);
+          const out = evalGate(c.gateType, inputsPowered);
+          if (out) {
+            const outNeighbor = getGateOutputNeighbor(c);
+            if (outNeighbor && isWire(outNeighbor.cell) && wireColorConnects(outNeighbor.cell, c)) {
+              gateOutputs.push(outNeighbor.cell);
+            }
+          }
+        } else if (c.type === 'delay') {
+          const inputsPowered = getGateInputsPowered(c);
+          if (inputsPowered > 0) {
+            if (!c._delayCounter) c._delayCounter = c.delay;
+            c._delayCounter--;
+            if (c._delayCounter <= 0) {
+              const outNeighbor = getGateOutputNeighbor(c);
+              if (outNeighbor && isWire(outNeighbor.cell) && wireColorConnects(outNeighbor.cell, c)) {
+                gateOutputs.push(outNeighbor.cell);
+              }
+              c._delayCounter = c.delay;
+            }
+          }
+        } else if (c.type === 'memory') {
+          const inputsPowered = getGateInputsPowered(c);
+          if (inputsPowered >= 1) c.memoryState = true;
+          const neigh = neighbors(c.x, c.y);
+          neigh.forEach(n => {
+            if (isWire(n.cell) && n.cell.powered && isBlockSideInput(c, n.dir)) {
+              c.memoryState = false;
+            }
+          });
+        } else if (c.type === 'comparator') {
+          const inputsPowered = getGateInputsPowered(c);
+          if (inputsPowered >= 1) {
+            const outNeighbor = getGateOutputNeighbor(c);
+            if (outNeighbor && isWire(outNeighbor.cell) && wireColorConnects(outNeighbor.cell, c)) {
+              gateOutputs.push(outNeighbor.cell);
+            }
+          }
+        }
+      }
+    }
+    gateOutputs.forEach(w => { w.powered = true; });
+
+    propagateWires();
+
+    for (let y = 0; y < GRID_SIZE; y++) {
+      for (let x = 0; x < GRID_SIZE; x++) {
+        const c = cells[y][x];
+        if (c.type === 'lamp' || c.type === 'multi-lamp') {
+          const neigh = neighbors(c.x, c.y);
+          let on = false;
+          for (const n of neigh) {
+            const nb = n.cell;
+            if (isWire(nb) && nb.powered) {
+              on = true;
+              break;
+            }
+            if ((nb.type === 'power' || nb.type === 'button' || nb.type === 'lever' || nb.type === 'gate' || nb.type === 'delay' || nb.type === 'pulse' || nb.type === 'memory' || nb.type === 'comparator') &&
+                nb.powered &&
+                isBlockSideOutput(nb, oppositeSide(n.dir))) {
+              on = true;
+              break;
+            }
+          }
+          c.on = on;
+        }
+      }
+    }
+
+    propagateLampAdjacency();
+    render();
+    drawMinimap();
+  }
+
+  function propagateWires() {
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (let y = 0; y < GRID_SIZE; y++) {
+        for (let x = 0; x < GRID_SIZE; x++) {
+          const c = cells[y][x];
+          if (!isWire(c)) continue;
+          if (c.powered) continue;
+          const neigh = neighbors(x, y);
+          let shouldPower = false;
+          for (const n of neigh) {
+            const nb = n.cell;
+            if (!wireColorConnects(c, nb)) continue;
+            if (isWire(nb) && nb.powered) {
+              shouldPower = true;
+              break;
+            }
+            if ((nb.type === 'power' || nb.type === 'button' || nb.type === 'lever' || nb.type === 'gate' || nb.type === 'delay' || nb.type === 'pulse' || nb.type === 'memory' || nb.type === 'comparator') &&
+                nb.powered &&
+                isBlockSideOutput(nb, oppositeSide(n.dir))) {
+              shouldPower = true;
+              break;
+            }
+          }
+          if (shouldPower) {
+            c.powered = true;
+            changed = true;
+          }
+        }
+      }
+    }
+  }
+
+  function getGateInputsPowered(gate) {
+    const x = gate.x;
+    const y = gate.y;
+    const neigh = neighbors(x, y);
+    let count = 0;
+    neigh.forEach(n => {
+      const nb = n.cell;
+      const side = n.dir;
+      if (!isWire(nb)) return;
+      if (!wireColorConnects(nb, gate)) return;
+      if (!isBlockSideInput(gate, side)) return;
+      if (nb.powered) count++;
+    });
+    return count;
+  }
+
+  function getGateOutputNeighbor(gate) {
+    const x = gate.x;
+    const y = gate.y;
+    const neigh = neighbors(x, y);
+    for (const n of neigh) {
+      const side = n.dir;
+      if (isBlockSideOutput(gate, side)) {
+        return n;
+      }
+    }
+    return null;
+  }
+
+  function evalGate(type, inputsPoweredCount) {
+    const n = inputsPoweredCount;
+    switch (type) {
+      case 'and':
+        return n >= 2;
+      case 'or':
+        return n >= 1;
+      case 'xor':
+        return n === 1;
+      case 'nand':
+        return !(n >= 2);
+      case 'nor':
+        return !(n >= 1);
+      case 'xnor':
+        return !(n === 1);
+      default:
+        return false;
+    }
+  }
+
+  function propagateLampAdjacency() {
+    const visited = [];
+    for (let y = 0; y < GRID_SIZE; y++) {
+      visited[y] = [];
+      for (let x = 0; x < GRID_SIZE; x++) {
+        visited[y][x] = false;
+      }
+    }
+
+    for (let y = 0; y < GRID_SIZE; y++) {
+      for (let x = 0; x < GRID_SIZE; x++) {
+        const c = cells[y][x];
+        if ((c.type !== 'lamp' && c.type !== 'multi-lamp') || visited[y][x]) continue;
+
+        const stack = [c];
+        const group = [];
+        let anyOn = false;
+        visited[y][x] = true;
+
+        while (stack.length > 0) {
+          const cur = stack.pop();
+          group.push(cur);
+          if (cur.on) anyOn = true;
+          const neigh = neighbors(cur.x, cur.y);
+          for (const n of neigh) {
+            const nb = n.cell;
+            if ((nb.type === 'lamp' || nb.type === 'multi-lamp') && !visited[nb.y][nb.x]) {
+              visited[nb.y][nb.x] = true;
+              stack.push(nb);
+            }
+          }
+        }
+
+        if (anyOn) {
+          group.forEach(l => { l.on = true; });
+        }
+      }
+    }
+  }
+
+  function render() {
+    for (let y = 0; y < GRID_SIZE; y++) {
+      for (let x = 0; x < GRID_SIZE; x++) {
+        const c = cells[y][x];
+        const el = c.el;
+        el.className = 'cell';
+        el.textContent = '';
+        el.style.color = '';
+        el.innerHTML = '';
+
+        if (c.type === 'wire') {
+          el.classList.add('cell-wire');
+          el.style.color = c.color || '#ffffff';
+          if (c.powered) el.classList.add('powered');
+        } else if (c.type === 'wire_universal') {
+          el.classList.add('cell-wire-universal');
+          if (c.powered) el.classList.add('powered');
+        } else if (c.type === 'gate') {
+          el.classList.add('cell-gate');
+          el.textContent = c.gateType ? c.gateType.toUpperCase() : '';
+          addGateIOVisuals(c);
+        } else if (c.type === 'power') {
+          el.classList.add('cell-power');
+          el.textContent = 'P';
+        } else if (c.type === 'button') {
+          el.classList.add('cell-button');
+          if (c.on) el.classList.add('on');
+          el.textContent = 'B';
+        } else if (c.type === 'lever') {
+          el.classList.add('cell-lever');
+          if (c.on) el.classList.add('on');
+          el.textContent = 'L';
+        } else if (c.type === 'lamp') {
+          el.classList.add('cell-lamp');
+          if (c.on) el.classList.add('on');
+          el.textContent = 'L';
+        } else if (c.type === 'multi-lamp') {
+          el.classList.add('cell-lamp');
+          if (c.on) el.classList.add('on');
+          el.textContent = 'ML';
+        } else if (c.type === 'delay') {
+          el.classList.add('cell-delay');
+          el.textContent = 'D';
+          addGateIOVisuals(c);
+        } else if (c.type === 'pulse') {
+          el.classList.add('cell-pulse');
+          el.textContent = 'P';
+          addGateIOVisuals(c);
+        } else if (c.type === 'memory') {
+          el.classList.add('cell-memory');
+          el.textContent = 'MEM';
+          addGateIOVisuals(c);
+        } else if (c.type === 'comparator') {
+          el.classList.add('cell-comparator');
+          el.textContent = 'CMP';
+          addGateIOVisuals(c);
+        } else if (c.type === 'sensor') {
+          el.classList.add('cell-sensor');
+          el.textContent = 'S';
+        } else if (c.type === 'colorlock') {
+          el.classList.add('cell-colorlock');
+          el.textContent = 'CL';
+        }
+      }
+    }
+  }
+
+  function addGateIOVisuals(gate) {
+    const el = gate.el;
+    const o = gate.orientation;
+
+    function addIO(side, cls) {
+      const d = document.createElement('div');
+      d.className = 'io ' + cls;
+      if (side === 'left') {
+        d.style.left = '1px';
+        d.style.top = '50%';
+        d.style.transform = 'translateY(-50%)';
+      } else if (side === 'right') {
+        d.style.right = '1px';
+        d.style.top = '50%';
+        d.style.transform = 'translateY(-50%)';
+      } else if (side === 'up') {
+        d.style.top = '1px';
+        d.style.left = '50%';
+        d.style.transform = 'translateX(-50%)';
+      } else if (side === 'down') {
+        d.style.bottom = '1px';
+        d.style.left = '50%';
+        d.style.transform = 'translateX(-50%)';
+      }
+      el.appendChild(d);
+    }
+
+    if (o === 0) {
+      addIO('up', 'io-input');
+      addIO('down', 'io-input');
+      addIO('right', 'io-output');
+    } else if (o === 1) {
+      addIO('left', 'io-input');
+      addIO('right', 'io-input');
+      addIO('down', 'io-output');
+    } else if (o === 2) {
+      addIO('up', 'io-input');
+      addIO('down', 'io-input');
+      addIO('left', 'io-output');
+    } else if (o === 3) {
+      addIO('left', 'io-input');
+      addIO('right', 'io-input');
+      addIO('up', 'io-output');
+    }
+  }
+
+  function floodFill(startCell) {
+    if (startCell.type !== 'wire') return;
+    const targetColor = startCell.color;
+    const newColor = activeColor;
+    if (targetColor === newColor) return;
+    const stack = [startCell];
+    const visited = new Set();
+    while (stack.length) {
+      const c = stack.pop();
+      const key = c.x + ',' + c.y;
+      if (visited.has(key)) continue;
+      visited.add(key);
+      if (c.type === 'wire' && c.color === targetColor) {
+        c.color = newColor;
+        neighbors(c.x, c.y).forEach(n => {
+          if (n.cell.type === 'wire' && n.cell.color === targetColor) {
+            stack.push(n.cell);
+          }
+        });
+      }
+    }
+  }
+
+  function autoRoute(start, end) {
+    const queue = [start];
+    const prev = {};
+    const key = (x, y) => x + ',' + y;
+    prev[key(start.x, start.y)] = null;
+
+    while (queue.length) {
+      const c = queue.shift();
+      if (c === end) break;
+      neighbors(c.x, c.y).forEach(n => {
+        const nb = n.cell;
+        const k = key(nb.x, nb.y);
+        if (!prev.hasOwnProperty(k) && nb.type === 'empty') {
+          prev[k] = c;
+          queue.push(nb);
+        }
+      });
+    }
+
+    let cur = end;
+    if (!prev.hasOwnProperty(key(end.x, end.y))) return;
+    while (cur && cur !== start) {
+      cur.type = 'wire';
+      cur.color = activeColor;
+      cur = prev[key(cur.x, cur.y)];
+    }
+  }
+
+  function clearAll() {
+    for (let y = 0; y < GRID_SIZE; y++) {
+      for (let x = 0; x < GRID_SIZE; x++) {
+        eraseCell(cells[y][x]);
+      }
+    }
+  }
+
+  function pushHistory(label) {
+    const snapshot = {
+      label,
+      data: cells.map(row => row.map(c => structuredCloneCell(c)))
+    };
+    undoStack.push(snapshot);
+    if (undoStack.length > MAX_HISTORY) undoStack.shift();
+    redoStack = [];
+    updateTimeline();
+  }
+
+  function restoreSnapshot(snapshot) {
+    for (let y = 0; y < GRID_SIZE; y++) {
+      for (let x = 0; x < GRID_SIZE; x++) {
+        const src = snapshot.data[y][x];
+        const dst = cells[y][x];
+        Object.assign(dst, src, { el: dst.el, x, y });
+      }
+    }
+  }
+
+  function undo() {
+    if (undoStack.length === 0) return;
+    const snapshot = undoStack.pop();
+    redoStack.push(snapshot);
+    const prev = undoStack[undoStack.length - 1];
+    if (prev) restoreSnapshot(prev);
+    else clearAll();
+    updateTimeline();
+  }
+
+  function redo() {
+    if (redoStack.length === 0) return;
+    const snapshot = redoStack.pop();
+    undoStack.push(snapshot);
+    restoreSnapshot(snapshot);
+    updateTimeline();
+  }
+
+  function updateTimeline() {
+    timelineEl.innerHTML = '';
+    undoStack.forEach((snap, idx) => {
+      const item = document.createElement('div');
+      item.className = 'timeline-item';
+      item.textContent = `${idx}: ${snap.label}`;
+      item.addEventListener('click', () => {
+        restoreSnapshot(snap);
+      });
+      timelineEl.appendChild(item);
+    });
+  }
+
+  function saveToTxt() {
+    const data = cells.map(row => row.map(c => structuredCloneCell(c)));
+    const json = JSON.stringify(data);
+    const blob = new Blob([json], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'logic_sandbox_save.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function loadFromTxt() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.txt';
+    input.addEventListener('change', () => {
+      const file = input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const data = JSON.parse(reader.result);
+          for (let y = 0; y < GRID_SIZE; y++) {
+            for (let x = 0; x < GRID_SIZE; x++) {
+              const src = data[y][x];
+              const dst = cells[y][x];
+              Object.assign(dst, src, { el: dst.el, x, y });
+            }
+          }
+          pushHistory('load');
+        } catch (e) {
+          console.error('Invalid save file', e);
+        }
+      };
+      reader.readAsText(file);
+    });
+    input.click();
+  }
+
+  function drawMinimap() {
+    const w = minimap.width;
+    const h = minimap.height;
+    minimapCtx.fillStyle = '#000';
+    minimapCtx.fillRect(0, 0, w, h);
+    const sx = w / GRID_SIZE;
+    const sy = h / GRID_SIZE;
+    for (let y = 0; y < GRID_SIZE; y++) {
+      for (let x = 0; x < GRID_SIZE; x++) {
+        const c = cells[y][x];
+        if (c.type === 'empty') continue;
+        if (c.type === 'wire' || c.type === 'wire_universal') {
+          minimapCtx.fillStyle = c.powered ? '#ff0000' : '#555';
+        } else if (c.type === 'lamp' || c.type === 'multi-lamp') {
+          minimapCtx.fillStyle = c.on ? '#ffff00' : '#444400';
+        } else {
+          minimapCtx.fillStyle = '#00ffcc';
+        }
+        minimapCtx.fillRect(x * sx, y * sy, sx, sy);
+      }
+    }
+  }
+
+  minimap.addEventListener('click', (e) => {
+    const rect = minimap.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const gx = (x / minimap.width) * GRID_SIZE;
+    const gy = (y / minimap.height) * GRID_SIZE;
+    const cellSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--cell-size'), 10);
+    gridContainer.scrollLeft = gx * cellSize - gridContainer.clientWidth / 2;
+    gridContainer.scrollTop = gy * cellSize - gridContainer.clientHeight / 2;
+  });
+
+  zoomSlider.addEventListener('input', () => {
+    const size = parseInt(zoomSlider.value, 10);
+    document.documentElement.style.setProperty('--cell-size', size + 'px');
+  });
+
+  undoBtn.addEventListener('click', undo);
+  redoBtn.addEventListener('click', redo);
+  saveBtn.addEventListener('click', saveToTxt);
+  loadBtn.addEventListener('click', loadFromTxt);
+  exportBtn.addEventListener('click', exportPNG);
+
+  window.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && e.key.toLowerCase() === 'z') {
+      e.preventDefault();
+      undo();
+    } else if (e.ctrlKey && e.key.toLowerCase() === 'y') {
+      e.preventDefault();
+      redo();
+    }
+  });
+
+  function exportPNG() {
+    const cellSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--cell-size'), 10);
+    const canvas = document.createElement('canvas');
+    canvas.width = GRID_SIZE * cellSize;
+    canvas.height = GRID_SIZE * cellSize;
+    const ctx = canvas.getContext('2d');
+
+    ctx.fillStyle = '#101010';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    for (let y = 0; y < GRID_SIZE; y++) {
+      for (let x = 0; x < GRID_SIZE; x++) {
+        const c = cells[y][x];
+        const px = x * cellSize;
+        const py = y * cellSize;
+        if (c.type === 'empty') continue;
+        if (c.type === 'wire') {
+          ctx.fillStyle = c.color || '#ffffff';
+          ctx.fillRect(px + cellSize/4, py + cellSize/4, cellSize/2, cellSize/2);
+        } else if (c.type === 'wire_universal') {
+          ctx.fillStyle = '#aaaaaa';
+          ctx.fillRect(px + cellSize/4, py + cellSize/4, cellSize/2, cellSize/2);
+        } else {
+          ctx.fillStyle = '#444';
+          ctx.fillRect(px+1, py+1, cellSize-2, cellSize-2);
+        }
+      }
+    }
+
+    const url = canvas.toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'logic_sandbox.png';
+    a.click();
+  }
+
+  createGrid();
+  setupTabsAndTools();
+  setupModes();
+  setupPalette();
+  setupDrag();
+  setStatus();
+  pushHistory('init');
+  render();
+  drawMinimap();
+  setInterval(simulate, 80);
+})();
+</script>
+</body>
+</html>
