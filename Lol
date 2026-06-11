@@ -1,0 +1,2180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Logic Sandbox - HUD Overlay</title>
+<style>
+:root {
+  --bg: #111;
+  --panel-bg: #181818;
+  --panel-border: #333;
+  --grid-bg: #151515;
+  --cell-size: 24px;
+  --wire-off-brightness: 0.4;
+  --wire-on-brightness: 1.3;
+  --gate-bg: #123a6b;
+  --power-bg: #f0c14b;
+  --lamp-off-bg: #3a2a15;
+  --lamp-on-bg: #ffd94a;
+  --memory-off-bg: #1f4f2a;
+  --memory-on-bg: #3cff7a;
+  --delay-bg: #3b3b8b;
+  --pulse-bg: #8b3b5b;
+  --text: #eee;
+  --accent: #3fa9f5;
+  --accent-soft: #2b6a9b;
+  --tab-bg: #202020;
+  --tab-active-bg: #333;
+  --scrollbar: #444;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* GRID */
+.grid-container {
+  position: absolute;
+  inset: 0;
+  padding: 16px 280px;
+  background: var(--grid-bg);
+  overflow: auto;
+  cursor: default;
+  z-index: 1;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(64, var(--cell-size));
+  grid-template-rows: repeat(64, var(--cell-size));
+  gap: 0;
+  background: #101010;
+  border: 1px solid #222;
+}
+.cell {
+  width: var(--cell-size);
+  height: var(--cell-size);
+  border: 1px solid #1b1b1b;
+  position: relative;
+  background: #181818;
+  cursor: pointer;
+}
+.cell::after {
+  content: "";
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 2px;
+  opacity: 0;
+}
+
+/* WIRES */
+.cell-wire {
+  background: #202020;
+  color: #ff0000;
+}
+.cell-wire::after {
+  opacity: 1;
+  background: currentColor;
+  filter: brightness(var(--wire-off-brightness));
+}
+.cell-wire.powered::after {
+  filter: brightness(var(--wire-on-brightness));
+  box-shadow: 0 0 6px currentColor;
+}
+.cell-wire-universal {
+  background: #202020;
+  color: #aaaaaa;
+}
+.cell-wire-universal::after {
+  opacity: 1;
+  background: currentColor;
+  filter: brightness(var(--wire-off-brightness));
+}
+.cell-wire-universal.powered::after {
+  filter: brightness(var(--wire-on-brightness));
+  box-shadow: 0 0 6px currentColor;
+}
+
+/* WIRE LAYER (BRIDGE) */
+.cell-wire-layer {
+  background: #202020;
+  border-color: #555;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cell-wire-layer::after { opacity: 0; }
+.bridge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 2px;
+  margin: 1px;
+  box-shadow: 0 0 4px currentColor;
+}
+
+/* GATES & BLOCKS */
+.cell-gate {
+  background: var(--gate-bg);
+  border-color: #1f4f86;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cell-gate::after { opacity: 0; }
+.cell-gate-and { background: #5f1f2a; }
+.cell-gate-or { background: #1f5f2a; }
+.cell-gate-xor { background: #123a6b; }
+.cell-gate-core {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: rgba(0,0,0,0.25);
+}
+.cell-gate-powered .cell-gate-core { background: rgba(255,255,255,0.25); }
+.cell-gate .io {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+}
+.io-input { background: #4aa3ff; }
+.io-output { background: #ff4a4a; }
+
+/* POWER SOURCE */
+.cell-power {
+  background: var(--power-bg);
+  border-color: #b38b2a;
+  color: #111;
+  font-weight: 700;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 6px rgba(255,215,0,0.4);
+}
+.cell-power::after {
+  opacity: 1;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0%, #ffd94a 40%, #b38b2a 100%);
+}
+
+/* LEVER (COLOR GATE SWITCH) */
+.cell-lever {
+  background: #222;
+  border: 1px solid #555;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cell-lever.on {
+  border-color: #4aff7b;
+  box-shadow: 0 0 6px #4aff7b;
+}
+.cell-lever-core {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background: #333;
+}
+.cell-lever.on .cell-lever-core {
+  background: #2a3f2a;
+}
+.cell-lever-color-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 2px;
+  margin: 1px;
+}
+
+/* LAMP */
+.cell-lamp {
+  background: var(--lamp-off-bg);
+  border-color: #5a3a1a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cell-lamp::after {
+  opacity: 1;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #555 0%, #3a2a15 60%, #1a1208 100%);
+}
+.cell-lamp.on {
+  background: var(--lamp-on-bg);
+  box-shadow: 0 0 10px var(--lamp-on-bg);
+}
+.cell-lamp.on::after {
+  background: radial-gradient(circle, #fff 0%, #ffd94a 50%, #f0b000 100%);
+}
+
+/* DELAY BLOCK */
+.cell-delay {
+  background: var(--delay-bg);
+  border-color: #5555aa;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cell-delay::after { opacity: 0; }
+
+/* PULSE GENERATOR */
+.cell-pulse {
+  background: var(--pulse-bg);
+  border-color: #aa5577;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cell-pulse::after { opacity: 0; }
+
+/* MEMORY CELL */
+.cell-memory {
+  background: var(--memory-off-bg);
+  border-color: #2f7b3a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cell-memory.on {
+  background: var(--memory-on-bg);
+  box-shadow: 0 0 8px #3cff7a;
+}
+.cell-memory-core {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: #16351f;
+}
+.cell-memory.on .cell-memory-core {
+  background: #b8ffd0;
+}
+.cell-memory .io {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+}
+.io-mem-trigger { background: #4aa3ff; }
+.io-mem-data { background: #ffaa4a; }
+.io-mem-output { background: #ff4a4a; }
+
+/* HUD PANELS */
+.panel {
+  position: fixed;
+  top: 0;
+  width: 260px;
+  height: 100vh;
+  background: var(--panel-bg);
+  border-right: 1px solid var(--panel-border);
+  display: flex;
+  flex-direction: column;
+  z-index: 10;
+  transition: transform 0.2s ease, width 0.2s ease;
+}
+.panel-left { left: 0; }
+.panel-right {
+  right: 0;
+  border-right: none;
+  border-left: 1px solid var(--panel-border);
+}
+.panel.collapsed { transform: translateX(-220px); }
+.panel-right.collapsed { transform: translateX(220px); }
+.panel-header {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--panel-border);
+  font-weight: 600;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.panel-toggle {
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #222;
+  border: 1px solid #333;
+}
+.panel-content { flex: 1; overflow: auto; padding: 8px; }
+.tabs {
+  display: flex;
+  border-bottom: 1px solid var(--panel-border);
+}
+.tab {
+  flex: 1;
+  padding: 6px 4px;
+  text-align: center;
+  font-size: 13px;
+  cursor: pointer;
+  background: var(--tab-bg);
+  border-right: 1px solid var(--panel-border);
+  user-select: none;
+}
+.tab:last-child { border-right: none; }
+.tab.active {
+  background: var(--tab-active-bg);
+  color: #fff;
+  font-weight: 600;
+}
+.tool-list { padding: 8px 4px; }
+.tool-item {
+  padding: 6px 8px;
+  margin-bottom: 4px;
+  background: #222;
+  border-radius: 4px;
+  border: 1px solid #333;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.tool-item span {
+  font-size: 11px;
+  opacity: 0.7;
+}
+.tool-item.active {
+  border-color: var(--accent);
+  background: #1f2a36;
+}
+.status {
+  padding: 8px;
+  border-bottom: 1px solid var(--panel-border);
+  font-size: 13px;
+}
+.mode-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px;
+}
+.mode-btn {
+  flex: 1 1 30%;
+  padding: 4px 2px;
+  font-size: 11px;
+  background: #222;
+  border-radius: 4px;
+  border: 1px solid #333;
+  cursor: pointer;
+  text-align: center;
+  user-select: none;
+}
+.mode-btn.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* COLLAPSIBLE SECTIONS */
+.section { border-top: 1px solid var(--panel-border); }
+.section-header {
+  padding: 6px 8px;
+  font-size: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  background: #202020;
+}
+.section-header span { font-size: 11px; opacity: 0.8; }
+.section-body {
+  max-height: 400px;
+  overflow: hidden;
+  transition: max-height 0.2s ease;
+}
+.section.collapsed .section-body { max-height: 0; }
+
+/* PALETTE */
+.palette { padding: 8px; }
+.palette-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.color-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+  border: 1px solid #444;
+  cursor: pointer;
+}
+.color-swatch.active {
+  border-color: #fff;
+  box-shadow: 0 0 4px #fff;
+}
+.palette label {
+  font-size: 12px;
+  display: block;
+  margin-bottom: 4px;
+}
+#colorPicker {
+  width: 100%;
+  height: 28px;
+  border-radius: 4px;
+  border: 1px solid #444;
+  background: #222;
+}
+.last-color {
+  width: 24px;
+  height: 24px;
+  border-radius: 3px;
+  border: 1px solid #666;
+}
+.last-color-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+/* FAVORITE COLORS */
+.favorites-row {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+}
+.favorite-slot {
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+  border: 1px solid #555;
+  cursor: pointer;
+  background: #222;
+}
+
+/* ACTION BUTTONS */
+.action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 8px;
+}
+.action-btn {
+  flex: 1 1 45%;
+  padding: 4px;
+  font-size: 11px;
+  background: #222;
+  border-radius: 4px;
+  border: 1px solid #333;
+  cursor: pointer;
+  text-align: center;
+}
+
+/* TICK RATE */
+.tick-row {
+  padding: 6px 8px;
+  font-size: 11px;
+}
+.tick-row input[type="range"] { width: 100%; }
+.tick-row label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 11px;
+}
+
+/* TIMELINE */
+.timeline {
+  padding: 6px 8px;
+  max-height: 120px;
+  overflow: auto;
+  font-size: 11px;
+}
+.timeline-item {
+  padding: 2px 0;
+  cursor: pointer;
+  opacity: 0.8;
+}
+.timeline-item:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+
+/* FOOTER */
+.footer {
+  padding: 4px 8px;
+  font-size: 11px;
+  opacity: 0.6;
+  border-top: 1px solid var(--panel-border);
+}
+
+/* SELECTION OVERLAY */
+.selection-overlay {
+  position: absolute;
+  border: 1px solid #3fa9f5;
+  background: rgba(63,169,245,0.1);
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* POPUPS */
+.delay-popup,
+.pulse-popup {
+  position: fixed;
+  background: #181818;
+  border: 1px solid #444;
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 11px;
+  color: #eee;
+  z-index: 30;
+}
+.delay-popup h4,
+.pulse-popup h4 {
+  margin: 0 0 4px 0;
+  font-size: 11px;
+}
+.popup-row { margin-bottom: 4px; }
+.popup-row input {
+  width: 60px;
+  background: #222;
+  border: 1px solid #444;
+  color: #eee;
+  border-radius: 3px;
+  padding: 2px 4px;
+  font-size: 11px;
+}
+.popup-actions {
+  margin-top: 4px;
+  text-align: right;
+}
+.popup-actions button {
+  font-size: 11px;
+  background: #222;
+  color: #eee;
+  border: 1px solid #444;
+  border-radius: 3px;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+
+/* SCROLLBARS */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #111; }
+::-webkit-scrollbar-thumb { background: var(--scrollbar); }
+</style>
+</head>
+<body>
+
+<!-- GRID -->
+<div class="grid-container" id="gridContainer">
+  <div class="grid" id="grid"></div>
+</div>
+
+<!-- SELECTION OVERLAY -->
+<div class="selection-overlay" id="selectionOverlay" style="display:none;"></div>
+
+<!-- DELAY POPUP -->
+<div class="delay-popup" id="delayPopup" style="display:none;">
+  <h4>Delay Settings</h4>
+  <div class="popup-row">
+    Delay (ticks):
+    <input type="number" id="delayInput" min="1" max="40" value="4">
+  </div>
+  <div class="popup-actions">
+    <button id="delayOk">OK</button>
+    <button id="delayCancel">Cancel</button>
+  </div>
+</div>
+
+<!-- PULSE POPUP -->
+<div class="pulse-popup" id="pulsePopup" style="display:none;">
+  <h4>Pulse Settings</h4>
+  <div class="popup-row">
+    On ticks:
+    <input type="number" id="pulseOnInput" min="1" max="40" value="5">
+  </div>
+  <div class="popup-row">
+    Off ticks:
+    <input type="number" id="pulseOffInput" min="1" max="40" value="5">
+  </div>
+  <div class="popup-actions">
+    <button id="pulseOk">OK</button>
+    <button id="pulseCancel">Cancel</button>
+  </div>
+</div>
+
+<!-- LEFT PANEL -->
+<div class="panel panel-left" id="panelLeft">
+  <div class="panel-header">
+    <span>Tools</span>
+    <span class="panel-toggle" id="toggleLeft">Collapse</span>
+  </div>
+  <div class="tabs">
+    <div class="tab active" data-tab="wires">Wires</div>
+    <div class="tab" data-tab="logic">Logic</div>
+    <div class="tab" data-tab="special">Special</div>
+  </div>
+  <div class="panel-content">
+    <!-- WIRES -->
+    <div class="tool-list" data-tab-content="wires">
+      <div class="tool-item active" data-tool="wire-colored">
+        Wire (Colored) <span>wire</span>
+      </div>
+      <div class="tool-item" data-tool="wire-universal">
+        Wire (Universal) <span>wire_universal</span>
+      </div>
+      <div class="tool-item" data-tool="wire-layer">
+        Wire Layer Bridge <span>bridge</span>
+      </div>
+    </div>
+
+    <!-- LOGIC -->
+    <div class="tool-list" data-tab-content="logic" style="display:none;">
+      <div class="tool-item" data-tool="gate-and">AND Gate <span style="color:#ff4a4a;">AND</span></div>
+      <div class="tool-item" data-tool="gate-or">OR Gate <span style="color:#32cd32;">OR</span></div>
+      <div class="tool-item" data-tool="gate-xor">XOR Gate <span style="color:#00bfff;">XOR</span></div>
+      <div class="tool-item" data-tool="delay-block">Delay Block <span>delay</span></div>
+      <div class="tool-item" data-tool="pulse-generator">Pulse Generator <span>pulse</span></div>
+      <div class="tool-item" data-tool="memory-cell">Memory Cell <span>mem</span></div>
+    </div>
+
+    <!-- SPECIAL -->
+    <div class="tool-list" data-tab-content="special" style="display:none;">
+      <div class="tool-item" data-tool="power">
+        Power Source <span>power</span>
+      </div>
+      <div class="tool-item" data-tool="lever">
+        Lever <span>lever</span>
+      </div>
+      <div class="tool-item" data-tool="lamp">
+        Lamp <span>lamp</span>
+      </div>
+    </div>
+  </div>
+  <div class="footer">Click a tool, then click on the grid to place / use it.</div>
+</div>
+
+<!-- RIGHT PANEL -->
+<div class="panel panel-right" id="panelRight">
+  <div class="panel-header">
+    <span>Modes & HUD</span>
+    <span class="panel-toggle" id="toggleRight">Collapse</span>
+  </div>
+  <div class="status" id="statusText">Mode: mouse | Tool: wire-colored | Tick: 20/s</div>
+
+  <!-- MODES -->
+  <div class="mode-buttons">
+    <div class="mode-btn active" data-mode="mouse">Mouse</div>
+    <div class="mode-btn" data-mode="drag">Drag</div>
+    <div class="mode-btn" data-mode="rotate">Rotate</div>
+    <div class="mode-btn" data-mode="erase">Erase</div>
+    <div class="mode-btn" data-mode="select">Select</div>
+    <div class="mode-btn" data-mode="autoroute">Auto-Route</div>
+    <div class="mode-btn" data-mode="clear-all">Clear All</div>
+  </div>
+
+  <!-- INFO -->
+  <div class="panel-content">
+    <div style="font-size:13px;margin-bottom:6px;">Info:</div>
+    <ul style="margin:0 0 10px 16px;font-size:11px;padding:0;">
+      <li><b>Mouse</b>: place blocks, toggle lever, configure delay/pulse/memory.</li>
+      <li><b>Drag</b>: hold mouse in grid to move the view.</li>
+      <li><b>Rotate</b>: click blocks to rotate orientation.</li>
+      <li><b>Erase</b>: hold mouse to erase continuously.</li>
+      <li><b>Select</b>: drag to create blue selection box, then move/delete.</li>
+      <li><b>Auto-Route</b>: click start and end to auto-wire.</li>
+      <li><b>Clear All</b>: clear the entire grid.</li>
+    </ul>
+  </div>
+
+  <!-- COLORS & TICK -->
+  <div class="section" id="sectionColors">
+    <div class="section-header">
+      <span>Colors & Tick</span>
+      <span>▼</span>
+    </div>
+    <div class="section-body">
+      <div class="palette">
+        <label>Wire Color Palette</label>
+        <div class="palette-row" id="paletteRow"></div>
+        <label>Custom Color</label>
+        <input type="color" id="colorPicker" value="#ff0000">
+        <div style="margin-top:8px;">
+          <div class="last-color-row">
+            <div class="last-color" id="lastColorBox"></div>
+            <span>Last used color</span>
+          </div>
+        </div>
+        <div style="margin-top:8px;font-size:12px;">Favorite Colors</div>
+        <div class="favorites-row" id="favoritesRow"></div>
+      </div>
+      <div class="tick-row">
+        Tick Rate (ticks per second)
+        <input type="range" id="tickSlider" min="5" max="60" value="20">
+        <label>
+          <input type="checkbox" id="freezeCheckbox">
+          Freeze simulation
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACTION CONSOLE -->
+  <div class="section" id="sectionActions">
+    <div class="section-header">
+      <span>Action Console</span>
+      <span>▼</span>
+    </div>
+    <div class="section-body">
+      <div class="action-buttons">
+        <div class="action-btn" id="undoBtn">Undo (Ctrl+Z)</div>
+        <div class="action-btn" id="redoBtn">Redo (Ctrl+Y)</div>
+        <div class="action-btn" id="saveBtn">Save to TXT</div>
+        <div class="action-btn" id="loadBtn">Load from TXT</div>
+        <div class="action-btn" id="exportBtn">Export PNG</div>
+      </div>
+      <div class="timeline" id="timeline"></div>
+    </div>
+  </div>
+
+  <div class="footer">HUD overlay: grid is draggable, UI stays fixed.</div>
+</div>
+
+<script>
+(function() {
+  const GRID_SIZE = 64;
+  const gridEl = document.getElementById('grid');
+  const gridContainer = document.getElementById('gridContainer');
+  const statusText = document.getElementById('statusText');
+  const paletteRow = document.getElementById('paletteRow');
+  const colorPicker = document.getElementById('colorPicker');
+  const lastColorBox = document.getElementById('lastColorBox');
+  const favoritesRow = document.getElementById('favoritesRow');
+  const timelineEl = document.getElementById('timeline');
+  const undoBtn = document.getElementById('undoBtn');
+  const redoBtn = document.getElementById('redoBtn');
+  const saveBtn = document.getElementById('saveBtn');
+  const loadBtn = document.getElementById('loadBtn');
+  const exportBtn = document.getElementById('exportBtn');
+  const tickSlider = document.getElementById('tickSlider');
+  const freezeCheckbox = document.getElementById('freezeCheckbox');
+  const selectionOverlay = document.getElementById('selectionOverlay');
+  const delayPopup = document.getElementById('delayPopup');
+  const delayInput = document.getElementById('delayInput');
+  const delayOk = document.getElementById('delayOk');
+  const delayCancel = document.getElementById('delayCancel');
+  const pulsePopup = document.getElementById('pulsePopup');
+  const pulseOnInput = document.getElementById('pulseOnInput');
+  const pulseOffInput = document.getElementById('pulseOffInput');
+  const pulseOk = document.getElementById('pulseOk');
+  const pulseCancel = document.getElementById('pulseCancel');
+  const panelLeft = document.getElementById('panelLeft');
+  const panelRight = document.getElementById('panelRight');
+  const toggleLeft = document.getElementById('toggleLeft');
+  const toggleRight = document.getElementById('toggleRight');
+  const sectionColors = document.getElementById('sectionColors');
+  const sectionActions = document.getElementById('sectionActions');
+
+  const cells = [];
+  let currentTool = 'wire-colored';
+  let currentMode = 'mouse';
+  let activeColor = '#ff0000';
+  let lastColor = '#ff0000';
+  let simulationFrozen = false;
+  let tickRate = 20;
+  let simulateInterval = null;
+
+  const paletteColors = [
+    '#ff0000', '#00ff00', '#0000ff', '#ffff00',
+    '#ff00ff', '#00ffff', '#ffffff', '#ffa500',
+    '#00ff7f', '#8a2be2', '#ff1493', '#00bfff'
+  ];
+  const favoriteColors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ffffff'];
+
+  let isDraggingView = false;
+  let dragStartX = 0;
+  let dragStartY = 0;
+  let dragScrollLeft = 0;
+  let dragScrollTop = 0;
+
+  let isMouseDown = false;
+  let mouseButton = 0;
+
+  let selectionStart = null;
+  let selectionRect = null;
+  let selectionCells = [];
+  let isDraggingSelection = false;
+
+  let autorouteStart = null;
+
+  let undoStack = [];
+  let redoStack = [];
+  const MAX_HISTORY = 50;
+
+  let currentDelayCell = null;
+  let currentPulseCell = null;
+
+  function createGrid() {
+    for (let y = 0; y < GRID_SIZE; y++) {
+      cells[y] = [];
+      for (let x = 0; x < GRID_SIZE; x++) {
+        const cellEl = document.createElement('div');
+        cellEl.className = 'cell';
+        cellEl.dataset.x = x;
+        cellEl.dataset.y = y;
+        gridEl.appendChild(cellEl);
+
+        const cell = {
+          x,
+          y,
+          el: cellEl,
+          type: 'empty',
+          gateType: null,
+          orientation: 0,
+          color: null,
+          powered: false,
+          on: false,
+          delay: 4,
+          delayCounter: 0,
+          pulsePhase: 0,
+          pulseOn: 5,
+          pulseOff: 5,
+          memoryState: false,
+          memoryColor: null,
+          intensity: 0,
+          layerColors: {},
+          leverColors: {} // color -> true
+        };
+        cells[y][x] = cell;
+
+        cellEl.addEventListener('mousedown', (e) => {
+          isMouseDown = true;
+          mouseButton = e.button;
+          handleCellMouseDown(cell, e);
+        });
+        cellEl.addEventListener('mouseenter', (e) => {
+          if (currentMode === 'erase' && isMouseDown && mouseButton === 0) {
+            eraseCell(cell);
+          }
+          if (currentMode === 'select' && isMouseDown && mouseButton === 0 && selectionStart) {
+            updateSelectionRect(cell);
+          }
+        });
+        cellEl.addEventListener('mouseup', () => {
+          isMouseDown = false;
+        });
+      }
+    }
+  }
+
+  function handleCellMouseDown(cell, e) {
+    if (currentMode === 'drag') return;
+
+    if (currentMode === 'erase' && e.button === 0) {
+      pushHistory('erase');
+      eraseCell(cell);
+      return;
+    }
+
+    if (currentMode === 'clear-all') {
+      pushHistory('clear-all');
+      clearAll();
+      return;
+    }
+
+    if (currentMode === 'select') {
+      if (e.button === 0) {
+        selectionStart = cell;
+        selectionRect = { x1: cell.x, y1: cell.y, x2: cell.x, y2: cell.y };
+        updateSelectionOverlay();
+      } else if (e.button === 2 && selectionCells.length > 0) {
+        isDraggingSelection = true;
+      }
+      return;
+    }
+
+    if (currentMode === 'autoroute') {
+      if (!autorouteStart) {
+        autorouteStart = cell;
+      } else {
+        pushHistory('autoroute');
+        autoRoute(autorouteStart, cell);
+        autorouteStart = null;
+      }
+      return;
+    }
+
+    if (currentMode === 'rotate') {
+      if (['gate', 'power', 'lever', 'lamp', 'delay', 'pulse', 'memory', 'wire-layer'].includes(cell.type)) {
+        cell.orientation = (cell.orientation + 1) % 4;
+      }
+      return;
+    }
+
+    if (currentMode === 'mouse') {
+      if (cell.type === 'lever') {
+        cell.on = !cell.on;
+        return;
+      }
+      if (cell.type === 'delay') {
+        openDelayPopup(cell);
+        return;
+      }
+      if (cell.type === 'pulse') {
+        openPulsePopup(cell);
+        return;
+      }
+      if (cell.type === 'memory') {
+        return;
+      }
+      pushHistory('edit');
+      placeTool(cell);
+    }
+  }
+
+  function setStatus() {
+    statusText.textContent = `Mode: ${currentMode} | Tool: ${currentTool} | Tick: ${tickRate}/s`;
+  }
+
+  function setupTabsAndTools() {
+    const tabs = document.querySelectorAll('.tab');
+    const tabContents = document.querySelectorAll('[data-tab-content]');
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        tabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        const name = tab.dataset.tab;
+        tabContents.forEach(c => {
+          c.style.display = c.dataset.tabContent === name ? 'block' : 'none';
+        });
+      });
+    });
+
+    const toolItems = document.querySelectorAll('.tool-item');
+    toolItems.forEach(item => {
+      item.addEventListener('click', () => {
+        toolItems.forEach(i => i.classList.remove('active'));
+        item.classList.add('active');
+        currentTool = item.dataset.tool;
+        setStatus();
+      });
+    });
+  }
+
+  function clearSelection() {
+    selectionStart = null;
+    selectionRect = null;
+    selectionCells = [];
+    isDraggingSelection = false;
+    selectionOverlay.style.display = 'none';
+  }
+
+  function setupModes() {
+    const modeBtns = document.querySelectorAll('.mode-btn');
+    modeBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        modeBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentMode = btn.dataset.mode;
+        clearSelection();
+        setStatus();
+      });
+    });
+  }
+
+  function setupCollapsibles() {
+    [sectionColors, sectionActions].forEach(section => {
+      const header = section.querySelector('.section-header');
+      header.addEventListener('click', () => {
+        section.classList.toggle('collapsed');
+      });
+    });
+  }
+
+  function setupPalette() {
+    paletteColors.forEach(color => {
+      const sw = document.createElement('div');
+      sw.className = 'color-swatch';
+      sw.style.background = color;
+      sw.dataset.color = color;
+      sw.addEventListener('click', () => {
+        activeColor = color;
+        lastColor = color;
+        updatePaletteActive();
+        updateLastColorBox();
+      });
+      paletteRow.appendChild(sw);
+    });
+    updatePaletteActive();
+    updateLastColorBox();
+
+    colorPicker.addEventListener('input', () => {
+      activeColor = colorPicker.value;
+      lastColor = activeColor;
+      updatePaletteActive();
+      updateLastColorBox();
+    });
+
+    favoriteColors.forEach((color, idx) => {
+      const slot = document.createElement('div');
+      slot.className = 'favorite-slot';
+      slot.style.background = color;
+      slot.dataset.index = idx;
+      slot.addEventListener('click', (e) => {
+        if (e.shiftKey) {
+          favoriteColors[idx] = activeColor;
+          slot.style.background = activeColor;
+        } else {
+          activeColor = favoriteColors[idx];
+          lastColor = activeColor;
+          updatePaletteActive();
+          updateLastColorBox();
+        }
+      });
+      favoritesRow.appendChild(slot);
+    });
+  }
+
+  function updatePaletteActive() {
+    const swatches = document.querySelectorAll('.color-swatch');
+    swatches.forEach(sw => {
+      if (sw.dataset.color.toLowerCase() === activeColor.toLowerCase()) {
+        sw.classList.add('active');
+      } else {
+        sw.classList.remove('active');
+      }
+    });
+  }
+
+  function updateLastColorBox() {
+    lastColorBox.style.background = lastColor;
+  }
+
+  function setupDragView() {
+    gridContainer.addEventListener('mousedown', (e) => {
+      if (currentMode !== 'drag') return;
+      isDraggingView = true;
+      dragStartX = e.clientX;
+      dragStartY = e.clientY;
+      dragScrollLeft = gridContainer.scrollLeft;
+      dragScrollTop = gridContainer.scrollTop;
+      gridContainer.style.cursor = 'grabbing';
+      e.preventDefault();
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDraggingView) return;
+      const dx = e.clientX - dragStartX;
+      const dy = e.clientY - dragStartY;
+      gridContainer.scrollLeft = dragScrollLeft - dx;
+      gridContainer.scrollTop = dragScrollTop - dy;
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (isDraggingView) {
+        isDraggingView = false;
+        gridContainer.style.cursor = 'default';
+      }
+      isMouseDown = false;
+      if (currentMode === 'select') {
+        finalizeSelection();
+        isDraggingSelection = false;
+      }
+    });
+  }
+
+  function placeTool(cell) {
+    if (currentTool === 'wire-colored') {
+      if (cell.type === 'wire') {
+        cell.color = activeColor;
+        lastColor = activeColor;
+        updateLastColorBox();
+        return;
+      }
+      cell.type = 'wire';
+      cell.color = activeColor;
+      cell.gateType = null;
+      cell.on = false;
+      return;
+    }
+
+    if (currentTool === 'wire-universal') {
+      cell.type = 'wire_universal';
+      cell.color = null;
+      cell.gateType = null;
+      cell.on = false;
+      return;
+    }
+
+    if (currentTool === 'wire-layer') {
+      cell.type = 'wire-layer';
+      cell.layerColors = {};
+      return;
+    }
+
+    switch (currentTool) {
+      case 'gate-and':
+        cell.type = 'gate';
+        cell.gateType = 'and';
+        cell.on = false;
+        break;
+      case 'gate-or':
+        cell.type = 'gate';
+        cell.gateType = 'or';
+        cell.on = false;
+        break;
+      case 'gate-xor':
+        cell.type = 'gate';
+        cell.gateType = 'xor';
+        cell.on = false;
+        break;
+      case 'delay-block':
+        cell.type = 'delay';
+        cell.delay = 4;
+        cell.delayCounter = 0;
+        break;
+      case 'pulse-generator':
+        cell.type = 'pulse';
+        cell.pulseOn = 5;
+        cell.pulseOff = 5;
+        cell.pulsePhase = 0;
+        break;
+      case 'memory-cell':
+        cell.type = 'memory';
+        cell.memoryState = false;
+        cell.memoryColor = null;
+        break;
+      case 'power':
+        cell.type = 'power';
+        cell.intensity = 20;
+        break;
+      case 'lever':
+        cell.type = 'lever';
+        cell.on = false;
+        cell.leverColors = {};
+        break;
+      case 'lamp':
+        cell.type = 'lamp';
+        cell.on = false;
+        break;
+      default:
+        break;
+    }
+  }
+
+  function eraseCell(cell) {
+    cell.type = 'empty';
+    cell.gateType = null;
+    cell.color = null;
+    cell.on = false;
+    cell.powered = false;
+    cell.delay = 4;
+    cell.delayCounter = 0;
+    cell.pulsePhase = 0;
+    cell.pulseOn = 5;
+    cell.pulseOff = 5;
+    cell.memoryState = false;
+    cell.memoryColor = null;
+    cell.intensity = 0;
+    cell.layerColors = {};
+    cell.leverColors = {};
+  }
+
+  function structuredCloneCell(c) {
+    return {
+      type: c.type,
+      gateType: c.gateType,
+      orientation: c.orientation,
+      color: c.color,
+      powered: c.powered,
+      on: c.on,
+      delay: c.delay,
+      delayCounter: c.delayCounter,
+      pulsePhase: c.pulsePhase,
+      pulseOn: c.pulseOn,
+      pulseOff: c.pulseOff,
+      memoryState: c.memoryState,
+      memoryColor: c.memoryColor,
+      intensity: c.intensity,
+      layerColors: Object.assign({}, c.layerColors),
+      leverColors: Object.assign({}, c.leverColors)
+    };
+  }
+
+  function neighbors(x, y) {
+    const res = [];
+    if (x > 0) res.push({ dir: 'left', cell: cells[y][x - 1] });
+    if (x < GRID_SIZE - 1) res.push({ dir: 'right', cell: cells[y][x + 1] });
+    if (y > 0) res.push({ dir: 'up', cell: cells[y - 1][x] });
+    if (y < GRID_SIZE - 1) res.push({ dir: 'down', cell: cells[y + 1][x] });
+    return res;
+  }
+
+  function isWire(cell) {
+    return cell.type === 'wire' || cell.type === 'wire_universal';
+  }
+
+  function wireColorConnects(a, b) {
+    if (!isWire(a) || !isWire(b)) return true;
+    if (a.type === 'wire_universal' || b.type === 'wire_universal') return true;
+    if (!a.color || !b.color) return false;
+    return a.color.toLowerCase() === b.color.toLowerCase();
+  }
+
+  function isBlockSideInput(block, side) {
+    if (block.type === 'gate' || block.type === 'delay' || block.type === 'pulse') {
+      const o = block.orientation;
+      if (o === 0 || o === 2) {
+        return side === 'up' || side === 'down';
+      } else if (o === 1 || o === 3) {
+        return side === 'left' || side === 'right';
+      }
+    } else if (block.type === 'lever') {
+      const o = block.orientation;
+      if (o === 0) return side === 'left';
+      if (o === 1) return side === 'up';
+      if (o === 2) return side === 'right';
+      if (o === 3) return side === 'down';
+    } else if (block.type === 'power') {
+      return true;
+    } else if (block.type === 'lamp') {
+      return true;
+    } else if (block.type === 'memory') {
+      const io = memoryIOSides(block);
+      if (side === io.dataSide || io.triggerSides.includes(side)) return true;
+    }
+    return false;
+  }
+
+  function isBlockSideOutput(block, side) {
+    if (block.type === 'gate' || block.type === 'delay' || block.type === 'pulse') {
+      const o = block.orientation;
+      if (o === 0) return side === 'right';
+      if (o === 1) return side === 'down';
+      if (o === 2) return side === 'left';
+      if (o === 3) return side === 'up';
+    } else if (block.type === 'lever') {
+      const o = block.orientation;
+      if (o === 0) return side === 'right';
+      if (o === 1) return side === 'down';
+      if (o === 2) return side === 'left';
+      if (o === 3) return side === 'up';
+    } else if (block.type === 'power') {
+      return true;
+    } else if (block.type === 'lamp') {
+      return false;
+    } else if (block.type === 'memory') {
+      const io = memoryIOSides(block);
+      return side === io.outputSide;
+    }
+    return false;
+  }
+
+  function memoryIOSides(mem) {
+    const o = mem.orientation;
+    if (o === 0) {
+      return {
+        outputSide: 'up',
+        triggerSides: ['left', 'right'],
+        dataSide: 'down'
+      };
+    } else if (o === 1) {
+      return {
+        outputSide: 'right',
+        triggerSides: ['up', 'down'],
+        dataSide: 'left'
+      };
+    } else if (o === 2) {
+      return {
+        outputSide: 'down',
+        triggerSides: ['left', 'right'],
+        dataSide: 'up'
+      };
+    } else {
+      return {
+        outputSide: 'left',
+        triggerSides: ['up', 'down'],
+        dataSide: 'right'
+      };
+    }
+  }
+
+  function oppositeSide(side) {
+    if (side === 'left') return 'right';
+    if (side === 'right') return 'left';
+    if (side === 'up') return 'down';
+    if (side === 'down') return 'up';
+    return null;
+  }
+
+  function simulate() {
+    if (simulationFrozen) {
+      render();
+      return;
+    }
+
+    for (let y = 0; y < GRID_SIZE; y++) {
+      for (let x = 0; x < GRID_SIZE; x++) {
+        const c = cells[y][x];
+        c.powered = false;
+        c.intensity = 0;
+        if (c.type === 'lamp') c.on = false;
+      }
+    }
+
+    for (let y = 0; y < GRID_SIZE; y++) {
+      for (let x = 0; x < GRID_SIZE; x++) {
+        const c = cells[y][x];
+        if (c.type === 'power') {
+          c.powered = true;
+          c.intensity = 20;
+        } else if (c.type === 'pulse') {
+          const period = c.pulseOn + c.pulseOff;
+          if (period <= 0) continue;
+          c.pulsePhase = (c.pulsePhase + 1) % period;
+          c.powered = c.pulsePhase < c.pulseOn;
+          c.intensity = c.powered ? 15 : 0;
+        } else if (c.type === 'memory') {
+          if (c.memoryState) {
+            c.powered = true;
+            c.intensity = 10;
+          }
+        }
+      }
+    }
+
+    propagateWiresWithIntensity();
+
+    const gateOutputs = [];
+    const leverOutputs = [];
+
+    for (let y = 0; y < GRID_SIZE; y++) {
+      for (let x = 0; x < GRID_SIZE; x++) {
+        const c = cells[y][x];
+
+        if (c.type === 'gate') {
+          const inputsPowered = getGateInputsPowered(c);
+          const out = evalGate(c.gateType, inputsPowered.count);
+          if (out) {
+            const outNeighbor = getGateOutputNeighbor(c);
+            if (outNeighbor && isWire(outNeighbor.cell) && wireColorConnects(outNeighbor.cell, c)) {
+              gateOutputs.push({ cell: outNeighbor.cell, intensity: inputsPowered.maxIntensity });
+            }
+          }
+        } else if (c.type === 'delay') {
+          const inputsPowered = getGateInputsPowered(c);
+          if (inputsPowered.count > 0) {
+            if (!c.delayCounter || c.delayCounter <= 0) c.delayCounter = c.delay;
+            c.delayCounter--;
+            if (c.delayCounter <= 0) {
+              const outNeighbor = getGateOutputNeighbor(c);
+              if (outNeighbor && isWire(outNeighbor.cell) && wireColorConnects(outNeighbor.cell, c)) {
+                gateOutputs.push({ cell: outNeighbor.cell, intensity: inputsPowered.maxIntensity });
+              }
+              c.delayCounter = c.delay;
+            }
+          } else {
+            c.delayCounter = 0;
+          }
+        } else if (c.type === 'memory') {
+          const memInputs = getMemoryInputs(c);
+          if (memInputs.trigger) {
+            c.memoryState = memInputs.dataPowered;
+            c.memoryColor = memInputs.dataColor;
+          }
+        } else if (c.type === 'lever') {
+          updateLeverColorsFromInput(c);
+          if (c.on) {
+            const outNeighbor = getLeverOutputNeighbor(c);
+            if (outNeighbor && isWire(outNeighbor.cell)) {
+              const colors = Object.keys(c.leverColors);
+              colors.forEach(col => {
+                const inputPowered = isLeverColorPowered(c, col);
+                if (inputPowered) {
+                  leverOutputs.push({ cell: outNeighbor.cell, color: col, intensity: 10 });
+                }
+              });
+            }
+          }
+        }
+      }
+    }
+
+    gateOutputs.forEach(o => {
+      o.cell.powered = true;
+      o.cell.intensity = Math.max(o.cell.intensity, o.intensity);
+    });
+
+    leverOutputs.forEach(o => {
+      if (o.cell.type === 'wire') {
+        if (o.cell.color && o.cell.color.toLowerCase() === o.color.toLowerCase()) {
+          o.cell.powered = true;
+          o.cell.intensity = Math.max(o.cell.intensity, o.intensity);
+        }
+      } else if (o.cell.type === 'wire_universal') {
+        o.cell.powered = true;
+        o.cell.intensity = Math.max(o.cell.intensity, o.intensity);
+      }
+    });
+
+    propagateWiresWithIntensity();
+
+    for (let y = 0; y < GRID_SIZE; y++) {
+      for (let x = 0; x < GRID_SIZE; x++) {
+        const c = cells[y][x];
+        if (c.type === 'lamp') {
+          const neigh = neighbors(c.x, c.y);
+          let on = false;
+          for (const n of neigh) {
+            const nb = n.cell;
+            if (isWire(nb) && nb.powered) {
+              on = true;
+              break;
+            }
+            if ((nb.type === 'power' || nb.type === 'lever' || nb.type === 'gate' || nb.type === 'delay' || nb.type === 'pulse' || nb.type === 'memory') &&
+                nb.powered &&
+                isBlockSideOutput(nb, oppositeSide(n.dir))) {
+              on = true;
+              break;
+            }
+          }
+          c.on = on;
+        }
+      }
+    }
+
+    propagateLampAdjacency();
+    render();
+  }
+
+  function propagateWiresWithIntensity() {
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (let y = 0; y < GRID_SIZE; y++) {
+        for (let x = 0; x < GRID_SIZE; x++) {
+          const c = cells[y][x];
+          if (!isWire(c)) continue;
+          const neigh = neighbors(x, y);
+          let bestIntensity = c.intensity;
+          let shouldPower = c.powered;
+          for (const n of neigh) {
+            const nb = n.cell;
+            if (isWire(nb) && wireColorConnects(c, nb) && nb.powered) {
+              if (nb.intensity > bestIntensity) {
+                bestIntensity = nb.intensity;
+                shouldPower = true;
+              }
+            }
+            if ((nb.type === 'power' || nb.type === 'lever' || nb.type === 'gate' || nb.type === 'delay' || nb.type === 'pulse' || nb.type === 'memory') &&
+                nb.powered &&
+                isBlockSideOutput(nb, oppositeSide(n.dir))) {
+              if (nb.intensity > bestIntensity) {
+                bestIntensity = nb.intensity;
+                shouldPower = true;
+              }
+            }
+            if (nb.type === 'wire-layer') {
+              const color = c.color;
+              if (!color) continue;
+              nb.layerColors[color.toLowerCase()] = true;
+              const otherNeighbors = neighbors(nb.x, nb.y);
+              otherNeighbors.forEach(onb => {
+                const oc = onb.cell;
+                if (oc === c) return;
+                if (!isWire(oc)) return;
+                if (!oc.color) return;
+                if (oc.color.toLowerCase() !== color.toLowerCase()) return;
+                if (oc.powered && oc.intensity > bestIntensity) {
+                  bestIntensity = oc.intensity;
+                  shouldPower = true;
+                }
+              });
+            }
+          }
+          if (shouldPower && bestIntensity > c.intensity) {
+            c.powered = true;
+            c.intensity = bestIntensity;
+            changed = true;
+          }
+        }
+      }
+    }
+  }
+
+  function getGateInputsPowered(gate) {
+    const x = gate.x;
+    const y = gate.y;
+    const neigh = neighbors(x, y);
+    let count = 0;
+    let maxIntensity = 0;
+    neigh.forEach(n => {
+      const nb = n.cell;
+      const side = n.dir;
+      if (!isWire(nb)) return;
+      if (!wireColorConnects(nb, gate)) return;
+      if (!isBlockSideInput(gate, side)) return;
+      if (nb.powered) {
+        count++;
+        if (nb.intensity > maxIntensity) maxIntensity = nb.intensity;
+      }
+    });
+    return { count, maxIntensity };
+  }
+
+  function getGateOutputNeighbor(gate) {
+    const x = gate.x;
+    const y = gate.y;
+    const neigh = neighbors(x, y);
+    for (const n of neigh) {
+      const side = n.dir;
+      if (isBlockSideOutput(gate, side)) {
+        return n;
+      }
+    }
+    return null;
+  }
+
+  function getMemoryInputs(mem) {
+    const x = mem.x;
+    const y = mem.y;
+    const neigh = neighbors(x, y);
+    const io = memoryIOSides(mem);
+    let trigger = false;
+    let dataPowered = false;
+    let dataColor = null;
+
+    neigh.forEach(n => {
+      const nb = n.cell;
+      const side = n.dir;
+      if (!isWire(nb)) return;
+      if (io.triggerSides.includes(side)) {
+        if (nb.powered) trigger = true;
+      }
+      if (side === io.dataSide) {
+        if (nb.powered) {
+          dataPowered = true;
+          if (nb.color) dataColor = nb.color;
+        } else {
+          dataPowered = false;
+        }
+      }
+    });
+
+    return { trigger, dataPowered, dataColor };
+  }
+
+  function evalGate(type, inputsPoweredCount) {
+    const n = inputsPoweredCount;
+    if (type === 'and') return n >= 2;
+    if (type === 'or') return n >= 1;
+    if (type === 'xor') return n === 1;
+    return false;
+  }
+
+  function propagateLampAdjacency() {
+    const visited = [];
+    for (let y = 0; y < GRID_SIZE; y++) {
+      visited[y] = [];
+      for (let x = 0; x < GRID_SIZE; x++) {
+        visited[y][x] = false;
+      }
+    }
+
+    for (let y = 0; y < GRID_SIZE; y++) {
+      for (let x = 0; x < GRID_SIZE; x++) {
+        const c = cells[y][x];
+        if (c.type !== 'lamp' || visited[y][x]) continue;
+
+        const stack = [c];
+        const group = [];
+        let anyOn = false;
+        visited[y][x] = true;
+
+        while (stack.length > 0) {
+          const cur = stack.pop();
+          group.push(cur);
+          if (cur.on) anyOn = true;
+          const neigh = neighbors(cur.x, cur.y);
+          for (const n of neigh) {
+            const nb = n.cell;
+            if (nb.type === 'lamp' && !visited[nb.y][nb.x]) {
+              visited[nb.y][nb.x] = true;
+              stack.push(nb);
+            }
+          }
+        }
+
+        if (anyOn) {
+          group.forEach(l => { l.on = true; });
+        }
+      }
+    }
+  }
+
+  function updateLeverColorsFromInput(lever) {
+    const neigh = neighbors(lever.x, lever.y);
+    const o = lever.orientation;
+    let inputSide = null;
+    if (o === 0) inputSide = 'left';
+    else if (o === 1) inputSide = 'up';
+    else if (o === 2) inputSide = 'right';
+    else if (o === 3) inputSide = 'down';
+
+    lever.leverColors = {};
+    neigh.forEach(n => {
+      const nb = n.cell;
+      const side = n.dir;
+      if (side !== inputSide) return;
+      if (!isWire(nb)) return;
+      if (nb.color) {
+        lever.leverColors[nb.color.toLowerCase()] = true;
+      }
+    });
+  }
+
+  function isLeverColorPowered(lever, color) {
+    const neigh = neighbors(lever.x, lever.y);
+    const o = lever.orientation;
+    let inputSide = null;
+    if (o === 0) inputSide = 'left';
+    else if (o === 1) inputSide = 'up';
+    else if (o === 2) inputSide = 'right';
+    else if (o === 3) inputSide = 'down';
+
+    let powered = false;
+    neigh.forEach(n => {
+      const nb = n.cell;
+      const side = n.dir;
+      if (side !== inputSide) return;
+      if (!isWire(nb)) return;
+      if (!nb.color) return;
+      if (nb.color.toLowerCase() !== color.toLowerCase()) return;
+      if (nb.powered) powered = true;
+    });
+    return powered;
+  }
+
+  function getLeverOutputNeighbor(lever) {
+    const neigh = neighbors(lever.x, lever.y);
+    const o = lever.orientation;
+    let outputSide = null;
+    if (o === 0) outputSide = 'right';
+    else if (o === 1) outputSide = 'down';
+    else if (o === 2) outputSide = 'left';
+    else if (o === 3) outputSide = 'up';
+
+    for (const n of neigh) {
+      if (n.dir === outputSide) return n;
+    }
+    return null;
+  }
+
+  function render() {
+    for (let y = 0; y < GRID_SIZE; y++) {
+      for (let x = 0; x < GRID_SIZE; x++) {
+        const c = cells[y][x];
+        const el = c.el;
+        el.className = 'cell';
+        el.textContent = '';
+        el.style.color = '';
+        el.innerHTML = '';
+
+        if (c.type === 'wire') {
+          el.classList.add('cell-wire');
+          el.style.color = c.color || '#ffffff';
+          if (c.powered) el.classList.add('powered');
+        } else if (c.type === 'wire_universal') {
+          el.classList.add('cell-wire-universal');
+          if (c.powered) el.classList.add('powered');
+        } else if (c.type === 'wire-layer') {
+          el.classList.add('cell-wire-layer');
+          const colors = Object.keys(c.layerColors);
+          colors.slice(0, 4).forEach(col => {
+            const dot = document.createElement('div');
+            dot.className = 'bridge-dot';
+            dot.style.background = col;
+            dot.style.color = col;
+            el.appendChild(dot);
+          });
+        } else if (c.type === 'gate') {
+          el.classList.add('cell-gate');
+          if (c.gateType === 'and') {
+            el.classList.add('cell-gate-and');
+          } else if (c.gateType === 'or') {
+            el.classList.add('cell-gate-or');
+          } else if (c.gateType === 'xor') {
+            el.classList.add('cell-gate-xor');
+          }
+          const core = document.createElement('div');
+          core.className = 'cell-gate-core';
+          el.appendChild(core);
+          if (c.powered) el.classList.add('cell-gate-powered');
+          addGateIOVisuals(c);
+        } else if (c.type === 'power') {
+          el.classList.add('cell-power');
+          el.textContent = 'P';
+        } else if (c.type === 'lever') {
+          el.classList.add('cell-lever');
+          if (c.on) el.classList.add('on');
+          const core = document.createElement('div');
+          core.className = 'cell-lever-core';
+          el.appendChild(core);
+          const colors = Object.keys(c.leverColors);
+          colors.slice(0, 3).forEach(col => {
+            const dot = document.createElement('div');
+            dot.className = 'cell-lever-color-dot';
+            dot.style.background = col;
+            core.appendChild(dot);
+          });
+        } else if (c.type === 'lamp') {
+          el.classList.add('cell-lamp');
+          if (c.on) el.classList.add('on');
+        } else if (c.type === 'delay') {
+          el.classList.add('cell-delay');
+          el.textContent = String(c.delay);
+          addGateIOVisuals(c);
+        } else if (c.type === 'pulse') {
+          el.classList.add('cell-pulse');
+          el.textContent = String(c.pulseOn);
+          addGateIOVisuals(c);
+        } else if (c.type === 'memory') {
+          el.classList.add('cell-memory');
+          if (c.memoryState) el.classList.add('on');
+          const core = document.createElement('div');
+          core.className = 'cell-memory-core';
+          el.appendChild(core);
+          addMemoryIOVisuals(c);
+        }
+      }
+    }
+  }
+
+  function addGateIOVisuals(gate) {
+    const el = gate.el;
+    const o = gate.orientation;
+
+    function addIO(side, cls) {
+      const d = document.createElement('div');
+      d.className = 'io ' + cls;
+      if (side === 'left') {
+        d.style.left = '1px';
+        d.style.top = '50%';
+        d.style.transform = 'translateY(-50%)';
+      } else if (side === 'right') {
+        d.style.right = '1px';
+        d.style.top = '50%';
+        d.style.transform = 'translateY(-50%)';
+      } else if (side === 'up') {
+        d.style.top = '1px';
+        d.style.left = '50%';
+        d.style.transform = 'translateX(-50%)';
+      } else if (side === 'down') {
+        d.style.bottom = '1px';
+        d.style.left = '50%';
+        d.style.transform = 'translateX(-50%)';
+      }
+      el.appendChild(d);
+    }
+
+    if (o === 0) {
+      addIO('up', 'io-input');
+      addIO('down', 'io-input');
+      addIO('right', 'io-output');
+    } else if (o === 1) {
+      addIO('left', 'io-input');
+      addIO('right', 'io-input');
+      addIO('down', 'io-output');
+    } else if (o === 2) {
+      addIO('up', 'io-input');
+      addIO('down', 'io-input');
+      addIO('left', 'io-output');
+    } else if (o === 3) {
+      addIO('left', 'io-input');
+      addIO('right', 'io-input');
+      addIO('up', 'io-output');
+    }
+  }
+
+  function addMemoryIOVisuals(mem) {
+    const el = mem.el;
+    const io = memoryIOSides(mem);
+
+    function addIO(side, cls) {
+      const d = document.createElement('div');
+      d.className = 'io ' + cls;
+      if (side === 'left') {
+        d.style.left = '1px';
+        d.style.top = '50%';
+        d.style.transform = 'translateY(-50%)';
+      } else if (side === 'right') {
+        d.style.right = '1px';
+        d.style.top = '50%';
+        d.style.transform = 'translateY(-50%)';
+      } else if (side === 'up') {
+        d.style.top = '1px';
+        d.style.left = '50%';
+        d.style.transform = 'translateX(-50%)';
+      } else if (side === 'down') {
+        d.style.bottom = '1px';
+        d.style.left = '50%';
+        d.style.transform = 'translateX(-50%)';
+      }
+      el.appendChild(d);
+    }
+
+    addIO(io.outputSide, 'io-mem-output');
+    io.triggerSides.forEach(s => addIO(s, 'io-mem-trigger'));
+    addIO(io.dataSide, 'io-mem-data');
+  }
+
+  function autoRoute(start, end) {
+    const queue = [start];
+    const prev = {};
+    const key = (x, y) => x + ',' + y;
+    prev[key(start.x, start.y)] = null;
+
+    while (queue.length) {
+      const c = queue.shift();
+      if (c === end) break;
+      neighbors(c.x, c.y).forEach(n => {
+        const nb = n.cell;
+        const k = key(nb.x, nb.y);
+        if (!prev.hasOwnProperty(k) && nb.type === 'empty') {
+          prev[k] = c;
+          queue.push(nb);
+        }
+      });
+    }
+
+    let cur = end;
+    if (!prev.hasOwnProperty(key(end.x, end.y))) return;
+    while (cur && cur !== start) {
+      cur.type = 'wire';
+      cur.color = activeColor;
+      cur = prev[key(cur.x, cur.y)];
+    }
+  }
+
+  function clearAll() {
+    for (let y = 0; y < GRID_SIZE; y++) {
+      for (let x = 0; x < GRID_SIZE; x++) {
+        eraseCell(cells[y][x]);
+      }
+    }
+  }
+
+  function pushHistory(label) {
+    const snapshot = {
+      label,
+      data: cells.map(row => row.map(c => structuredCloneCell(c)))
+    };
+    undoStack.push(snapshot);
+    if (undoStack.length > MAX_HISTORY) undoStack.shift();
+    redoStack = [];
+    updateTimeline();
+  }
+
+  function restoreSnapshot(snapshot) {
+    for (let y = 0; y < GRID_SIZE; y++) {
+      for (let x = 0; x < GRID_SIZE; x++) {
+        const src = snapshot.data[y][x];
+        const dst = cells[y][x];
+        Object.assign(dst, src, { el: dst.el, x, y });
+      }
+    }
+  }
+
+  function undo() {
+    if (undoStack.length === 0) return;
+    const snapshot = undoStack.pop();
+    redoStack.push(snapshot);
+    const prev = undoStack[undoStack.length - 1];
+    if (prev) restoreSnapshot(prev);
+    else clearAll();
+    updateTimeline();
+  }
+
+  function redo() {
+    if (redoStack.length === 0) return;
+    const snapshot = redoStack.pop();
+    undoStack.push(snapshot);
+    restoreSnapshot(snapshot);
+    updateTimeline();
+  }
+
+  function updateTimeline() {
+    timelineEl.innerHTML = '';
+    undoStack.forEach((snap, idx) => {
+      const item = document.createElement('div');
+      item.className = 'timeline-item';
+      item.textContent = `${idx}: ${snap.label}`;
+      item.addEventListener('click', () => {
+        restoreSnapshot(snap);
+      });
+      timelineEl.appendChild(item);
+    });
+  }
+
+  function saveToTxt() {
+    const data = cells.map(row => row.map(c => structuredCloneCell(c)));
+    const json = JSON.stringify(data);
+    const blob = new Blob([json], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'logic_sandbox_save.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function loadFromTxt() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.txt';
+    input.addEventListener('change', () => {
+      const file = input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const data = JSON.parse(reader.result);
+          for (let y = 0; y < GRID_SIZE; y++) {
+            for (let x = 0; x < GRID_SIZE; x++) {
+              const src = data[y][x];
+              const dst = cells[y][x];
+              Object.assign(dst, src, { el: dst.el, x, y });
+            }
+          }
+          pushHistory('load');
+        } catch (e) {
+          console.error('Invalid save file', e);
+        }
+      };
+      reader.readAsText(file);
+    });
+    input.click();
+  }
+
+  function exportPNG() {
+    const cellSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--cell-size'), 10);
+    const canvas = document.createElement('canvas');
+    canvas.width = GRID_SIZE * cellSize;
+    canvas.height = GRID_SIZE * cellSize;
+    const ctx = canvas.getContext('2d');
+
+    ctx.fillStyle = '#101010';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    for (let y = 0; y < GRID_SIZE; y++) {
+      for (let x = 0; x < GRID_SIZE; x++) {
+        const c = cells[y][x];
+        const px = x * cellSize;
+        const py = y * cellSize;
+        if (c.type === 'empty') continue;
+        if (c.type === 'wire') {
+          ctx.fillStyle = c.color || '#ffffff';
+          ctx.fillRect(px + cellSize/4, py + cellSize/4, cellSize/2, cellSize/2);
+        } else if (c.type === 'wire_universal') {
+          ctx.fillStyle = '#aaaaaa';
+          ctx.fillRect(px + cellSize/4, py + cellSize/4, cellSize/2, cellSize/2);
+        } else if (c.type === 'wire-layer') {
+          ctx.fillStyle = '#555';
+          ctx.fillRect(px + 4, py + 4, cellSize - 8, cellSize - 8);
+        } else {
+          ctx.fillStyle = '#444';
+          ctx.fillRect(px+1, py+1, cellSize-2, cellSize-2);
+        }
+      }
+    }
+
+    const url = canvas.toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'logic_sandbox.png';
+    a.click();
+  }
+
+  function updateSelectionOverlay() {
+    if (!selectionRect) {
+      selectionOverlay.style.display = 'none';
+      return;
+    }
+    const x1 = Math.min(selectionRect.x1, selectionRect.x2);
+    const x2 = Math.max(selectionRect.x1, selectionRect.x2);
+    const y1 = Math.min(selectionRect.y1, selectionRect.y2);
+    const y2 = Math.max(selectionRect.y1, selectionRect.y2);
+
+    const cellSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--cell-size'), 10);
+    const left = x1 * cellSize + gridEl.getBoundingClientRect().left - gridContainer.getBoundingClientRect().left;
+    const top = y1 * cellSize + gridEl.getBoundingClientRect().top - gridContainer.getBoundingClientRect().top;
+    const width = (x2 - x1 + 1) * cellSize;
+    const height = (y2 - y1 + 1) * cellSize;
+
+    selectionOverlay.style.left = left + 'px';
+    selectionOverlay.style.top = top + 'px';
+    selectionOverlay.style.width = width + 'px';
+    selectionOverlay.style.height = height + 'px';
+    selectionOverlay.style.display = 'block';
+  }
+
+  function updateSelectionRect(cell) {
+    selectionRect.x2 = cell.x;
+    selectionRect.y2 = cell.y;
+    updateSelectionOverlay();
+  }
+
+  function finalizeSelection() {
+    if (!selectionRect) return;
+    const x1 = Math.min(selectionRect.x1, selectionRect.x2);
+    const x2 = Math.max(selectionRect.x1, selectionRect.x2);
+    const y1 = Math.min(selectionRect.y1, selectionRect.y2);
+    const y2 = Math.max(selectionRect.y1, selectionRect.y2);
+    selectionCells = [];
+    for (let y = y1; y <= y2; y++) {
+      for (let x = x1; x <= x2; x++) {
+        selectionCells.push(cells[y][x]);
+      }
+    }
+  }
+
+  window.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && e.key.toLowerCase() === 'z') {
+      e.preventDefault();
+      undo();
+    } else if (e.ctrlKey && e.key.toLowerCase() === 'y') {
+      e.preventDefault();
+      redo();
+    } else if (e.key.toLowerCase() === 'delete' && currentMode === 'select') {
+      if (selectionCells.length > 0) {
+        pushHistory('delete-selection');
+        selectionCells.forEach(c => eraseCell(c));
+      }
+    }
+  });
+
+  gridContainer.addEventListener('mousemove', (e) => {
+    if (currentMode === 'select' && isDraggingSelection && selectionRect) {
+      const cellSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--cell-size'), 10);
+      const dx = Math.round(e.movementX / cellSize);
+      const dy = Math.round(e.movementY / cellSize);
+      selectionRect.x1 += dx;
+      selectionRect.x2 += dx;
+      selectionRect.y1 += dy;
+      selectionRect.y2 += dy;
+      updateSelectionOverlay();
+    }
+  });
+
+  function startSimulationLoop() {
+    if (simulateInterval) clearInterval(simulateInterval);
+    const intervalMs = 1000 / tickRate;
+    simulateInterval = setInterval(simulate, intervalMs);
+  }
+
+  tickSlider.addEventListener('input', () => {
+    tickRate = parseInt(tickSlider.value, 10);
+    setStatus();
+    startSimulationLoop();
+  });
+
+  freezeCheckbox.addEventListener('change', () => {
+    simulationFrozen = freezeCheckbox.checked;
+  });
+
+  undoBtn.addEventListener('click', undo);
+  redoBtn.addEventListener('click', redo);
+  saveBtn.addEventListener('click', saveToTxt);
+  loadBtn.addEventListener('click', loadFromTxt);
+  exportBtn.addEventListener('click', exportPNG);
+
+  toggleLeft.addEventListener('click', () => {
+    panelLeft.classList.toggle('collapsed');
+  });
+  toggleRight.addEventListener('click', () => {
+    panelRight.classList.toggle('collapsed');
+  });
+
+  function openDelayPopup(cell) {
+    currentDelayCell = cell;
+    delayInput.value = cell.delay || 4;
+    const rect = cell.el.getBoundingClientRect();
+    delayPopup.style.left = (rect.right + 8) + 'px';
+    delayPopup.style.top = rect.top + 'px';
+    delayPopup.style.display = 'block';
+  }
+
+  delayOk.addEventListener('click', () => {
+    if (!currentDelayCell) return;
+    const val = parseInt(delayInput.value, 10);
+    if (!isNaN(val) && val >= 1 && val <= 40) {
+      currentDelayCell.delay = val;
+    }
+    delayPopup.style.display = 'none';
+    currentDelayCell = null;
+  });
+
+  delayCancel.addEventListener('click', () => {
+    delayPopup.style.display = 'none';
+    currentDelayCell = null;
+  });
+
+  function openPulsePopup(cell) {
+    currentPulseCell = cell;
+    pulseOnInput.value = cell.pulseOn || 5;
+    pulseOffInput.value = cell.pulseOff || 5;
+    const rect = cell.el.getBoundingClientRect();
+    pulsePopup.style.left = (rect.right + 8) + 'px';
+    pulsePopup.style.top = rect.top + 'px';
+    pulsePopup.style.display = 'block';
+  }
+
+  pulseOk.addEventListener('click', () => {
+    if (!currentPulseCell) return;
+    const onVal = parseInt(pulseOnInput.value, 10);
+    const offVal = parseInt(pulseOffInput.value, 10);
+    if (!isNaN(onVal) && !isNaN(offVal) && onVal >= 1 && offVal >= 1 && onVal <= 40 && offVal <= 40) {
+      currentPulseCell.pulseOn = onVal;
+      currentPulseCell.pulseOff = offVal;
+    }
+    pulsePopup.style.display = 'none';
+    currentPulseCell = null;
+  });
+
+  pulseCancel.addEventListener('click', () => {
+    pulsePopup.style.display = 'none';
+    currentPulseCell = null;
+  });
+
+  function init() {
+    createGrid();
+    setupTabsAndTools();
+    setupModes();
+    setupCollapsibles();
+    setupPalette();
+    setupDragView();
+    setStatus();
+    pushHistory('init');
+    render();
+    startSimulationLoop();
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
